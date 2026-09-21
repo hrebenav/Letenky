@@ -1,0 +1,561 @@
+// Microsite čte jen statické JSON soubory, které vygeneroval scripts/fetch-prices.mjs.
+// Žádný backend, žádné knihovny – graf je ručně kreslené inline SVG.
+
+const el = (id) => document.getElementById(id);
+
+const state = {
+  latest: null,
+  summary: null,
+  originNames: new Map(),
+  destinationNames: new Map(),
+  filters: {
+    origins: new Set(),
+    destinations: new Set(),
+    maxTransfers: '',
+    sort: 'price',
+    bestPerRoute: true,
+    dealsOnly: false,
+  },
+  limit: 100,
+  chart: null,
+};
+
+/* ---------- formátování ---------- */
+
+const czkFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 });
+const czk = (value) => `${czkFormat.format(Math.round(value))} Kč`;
+const czkShort = (value) =>
+  value >= 10000 ? `${czkFormat.format(Math.round(value / 100) / 10)} tis.` : czkFormat.format(value);
+
+function dayMonth(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${Number(d)}. ${Number(m)}.`;
+}
+function dayMonthYear(isoDate) {
+  return `${dayMonth(isoDate)} ${isoDate.slice(0, 4)}`;
+}
+function duration(minutes) {
+  if (!Number.isFinite(minutes)) return null;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
+}
+const cityName = (code) => state.originNames.get(code) ?? state.destinationNames.get(code) ?? code;
+const routeOf = (offer) => `${offer.origin}-${offer.destination}`;
+
+/* ---------- načtení dat ---------- */
+
+async function loadJson(path) {
+  const res = await fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+  return res.json();
+}
+
+async function init() {
+  try {
+    const [latest, summary] = await Promise.all([loadJson('data/latest.json'), loadJson('data/summary.json')]);
+    state.latest = latest;
+    state.summary = summary;
+  } catch (error) {
+    showBanner(
+      `Nepodařilo se načíst data (${error.message}). Pokud jsi stránku otevřela přímo ze souboru, spusť ji přes lokální server: <code>npx serve .</code>`,
+      'warn',
+    );
+    el('app').setAttribute('aria-busy', 'false');
+    return;
+  }
+
+  for (const o of state.latest.config.origins) state.originNames.set(o.code, o.name);
+  for (const d of state.latest.config.destinations) state.destinationNames.set(d.code, d.name);
+
+  buildChips();
+  bindControls();
+  renderHeader();
+  render();
+  el('app').setAttribute('aria-busy', 'false');
+}
+
+function showBanner(html, variant) {
+  const banner = el('banner');
+  banner.innerHTML = html;
+  banner.className = variant ? `banner banner--${variant}` : 'banner';
+  banner.hidden = false;
+}
+
+/* ---------- hlavička a filtry ---------- */
+
+function renderHeader() {
+  const { latest } = state;
+  const generated = new Date(latest.generatedAt);
+  const dep = latest.config.departureDates;
+  const ret = latest.config.returnDates;
+  el('subtitle').textContent =
+    `Odlet ${dayMonth(dep[0])}–${dayMonthYear(dep.at(-1))} · návrat ${dayMonth(ret[0])}–${dayMonthYear(ret.at(-1))} · ` +
+    `${latest.passengers} dospělí · ceny v ${latest.currency} · aktualizováno ${generated.toLocaleString('cs-CZ')}`;
+
+  el('footer-source').textContent = `Zdroj dat: ${latest.source}. Historie: ${latest.stats.historyDays + 1} dní.`;
+
+  if (latest.mode === 'demo') {
+    showBanner(
+      '<strong>Ukázková data.</strong> Tenhle běh proběhl v demo režimu bez připojení k API – čísla jsou vymyšlená a slouží jen k ukázce vzhledu. Po nastavení tokenu se stránka naplní reálnými cenami.',
+      'warn',
+    );
+  } else if (latest.stats.errors > 0) {
+    showBanner(`Poslední běh skončil s ${latest.stats.errors} chybami u jednotlivých kombinací – ostatní data jsou v pořádku.`);
+  }
+}
+
+function buildChips() {
+  const make = (container, items, set) => {
+    container.innerHTML = '';
+    for (const item of items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chip';
+      button.textContent = item.name;
+      button.title = item.code;
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        if (set.has(item.code)) set.delete(item.code);
+        else set.add(item.code);
+        button.setAttribute('aria-pressed', String(set.has(item.code)));
+        state.limit = 100;
+        render();
+      });
+      container.appendChild(button);
+    }
+  };
+  make(el('filter-origins'), state.latest.config.origins, state.filters.origins);
+  make(el('filter-destinations'), state.latest.config.destinations, state.filters.destinations);
+}
+
+function bindControls() {
+  el('filter-transfers').addEventListener('change', (e) => {
+    state.filters.maxTransfers = e.target.value;
+    render();
+  });
+  el('filter-sort').addEventListener('change', (e) => {
+    state.filters.sort = e.target.value;
+    render();
+  });
+  el('filter-best-per-route').addEventListener('change', (e) => {
+    state.filters.bestPerRoute = e.target.checked;
+    state.limit = 100;
+    render();
+  });
+  el('filter-deals-only').addEventListener('change', (e) => {
+    state.filters.dealsOnly = e.target.checked;
+    state.limit = 100;
+    render();
+  });
+  el('filter-reset').addEventListener('click', () => {
+    state.filters.origins.clear();
+    state.filters.destinations.clear();
+    state.filters.maxTransfers = '';
+    state.filters.dealsOnly = false;
+    el('filter-transfers').value = '';
+    el('filter-deals-only').checked = false;
+    for (const chip of document.querySelectorAll('.chip')) chip.setAttribute('aria-pressed', 'false');
+    state.limit = 100;
+    render();
+  });
+  el('offers-more').addEventListener('click', () => {
+    state.limit += 100;
+    renderTable(currentOffers());
+  });
+
+  const toggle = el('theme-toggle');
+  const stored = localStorage.getItem('letenky-theme');
+  if (stored) document.documentElement.dataset.theme = stored;
+  toggle.addEventListener('click', () => {
+    const isDark =
+      document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('letenky-theme', next);
+    render();
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderChart(), 150);
+  });
+}
+
+/* ---------- výběr dat podle filtrů ---------- */
+
+function selectedRoutes() {
+  const { origins, destinations } = state.filters;
+  const routes = [];
+  for (const o of state.latest.config.origins) {
+    if (origins.size && !origins.has(o.code)) continue;
+    for (const d of state.latest.config.destinations) {
+      if (destinations.size && !destinations.has(d.code)) continue;
+      routes.push(`${o.code}-${d.code}`);
+    }
+  }
+  return routes;
+}
+
+function currentOffers() {
+  const { filters } = state;
+  const maxTransfers = filters.maxTransfers === '' ? null : Number(filters.maxTransfers);
+
+  let offers = state.latest.offers.filter((offer) => {
+    if (filters.origins.size && !filters.origins.has(offer.origin)) return false;
+    if (filters.destinations.size && !filters.destinations.has(offer.destination)) return false;
+    if (maxTransfers !== null) {
+      const t = Math.max(offer.transfers ?? 0, offer.returnTransfers ?? 0);
+      if (t > maxTransfers) return false;
+    }
+    if (filters.dealsOnly && !offer.isDeal) return false;
+    return true;
+  });
+
+  if (filters.bestPerRoute) {
+    const best = new Map();
+    for (const offer of offers) {
+      const key = routeOf(offer);
+      const current = best.get(key);
+      if (!current || offer.priceTotal < current.priceTotal) best.set(key, offer);
+    }
+    offers = [...best.values()];
+  }
+
+  const sorters = {
+    price: (a, b) => a.priceTotal - b.priceTotal,
+    deal: (a, b) => (b.dealPct ?? -999) - (a.dealPct ?? -999) || a.priceTotal - b.priceTotal,
+    departure: (a, b) => a.departureDate.localeCompare(b.departureDate) || a.priceTotal - b.priceTotal,
+    route: (a, b) => routeOf(a).localeCompare(routeOf(b)) || a.priceTotal - b.priceTotal,
+  };
+  return offers.sort(sorters[filters.sort] ?? sorters.price);
+}
+
+/* ---------- vykreslení ---------- */
+
+function render() {
+  const offers = currentOffers();
+  renderTiles(offers);
+  renderChart();
+  renderDestinationBars();
+  renderTable(offers);
+  renderErrors();
+}
+
+function renderTiles(offers) {
+  const cheapest = offers[0] && offers.reduce((a, b) => (b.priceTotal < a.priceTotal ? b : a));
+  if (cheapest) {
+    el('kpi-today-value').textContent = czk(cheapest.priceTotal);
+    el('kpi-today-note').textContent =
+      `${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} · ${dayMonth(cheapest.departureDate)}–${dayMonth(cheapest.returnDate)} · ${czk(cheapest.pricePerPerson)} za osobu`;
+  } else {
+    el('kpi-today-value').textContent = '—';
+    el('kpi-today-note').textContent = 'pro zvolené filtry nic nenalezeno';
+  }
+
+  const series = trendSeries();
+  const withValue = series.filter((p) => p.value !== null);
+  if (withValue.length) {
+    const min = withValue.reduce((a, b) => (b.value < a.value ? b : a));
+    el('kpi-alltime-value').textContent = czk(min.value);
+    el('kpi-alltime-note').textContent = `nejníže ${dayMonthYear(min.date)} · sledováno ${withValue.length} dní`;
+    const avg = withValue.reduce((sum, p) => sum + p.value, 0) / withValue.length;
+    el('kpi-avg-value').textContent = czk(avg);
+    const todayValue = withValue.at(-1).value;
+    const diff = Math.round(((todayValue - avg) / avg) * 1000) / 10;
+    el('kpi-avg-note').textContent =
+      diff === 0 ? 'dnešek přesně na průměru' : `dnešek je ${diff < 0 ? `${Math.abs(diff)} % pod` : `${diff} % nad`} průměrem`;
+  } else {
+    el('kpi-alltime-value').textContent = '—';
+    el('kpi-alltime-note').textContent = 'zatím není historie';
+    el('kpi-avg-value').textContent = '—';
+    el('kpi-avg-note').textContent = 'první běh, historie se teprve buduje';
+  }
+
+  const { stats } = state.latest;
+  el('kpi-coverage-value').textContent = `${stats.offers} / ${stats.combinations}`;
+  el('kpi-coverage-note').textContent =
+    `kombinací s nabídkou · ${stats.empty} bez dat · ${stats.errors} chyb`;
+}
+
+/** Časová řada nejnižší ceny pro aktuálně vybrané trasy. */
+function trendSeries() {
+  const routes = new Set(selectedRoutes());
+  return (state.summary.trend ?? []).map((day) => {
+    let min = null;
+    let count = 0;
+    for (const [route, price] of Object.entries(day.byRoute ?? {})) {
+      if (!routes.has(route)) continue;
+      count += 1;
+      if (min === null || price < min) min = price;
+    }
+    return { date: day.date, value: min, count };
+  });
+}
+
+/* ---------- graf ---------- */
+
+function niceTicks(min, max, count) {
+  const span = Math.max(max - min, 1);
+  const rough = span / count;
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  const error = rough / magnitude;
+  const step = magnitude * (error >= 7.5 ? 10 : error >= 3.5 ? 5 : error >= 1.5 ? 2 : 1);
+  const ticks = [];
+  for (let value = Math.ceil(min / step) * step; value <= max + 1e-6; value += step) ticks.push(value);
+  return ticks;
+}
+
+function renderChart() {
+  const canvas = el('chart-canvas');
+  const series = trendSeries();
+  const points = series.filter((p) => p.value !== null);
+  const routeCount = selectedRoutes().length;
+  const totalRoutes = state.latest.config.origins.length * state.latest.config.destinations.length;
+
+  el('chart-sub').textContent =
+    `nejnižší cena za ${state.latest.passengers} osoby, ${routeCount === totalRoutes ? 'všechny trasy' : `vybrané trasy (${routeCount})`}`;
+
+  if (points.length < 2) {
+    canvas.innerHTML =
+      '<p class="empty">Graf se objeví, až bude aspoň dva dny historie. Každý denní běh přidá jeden bod.</p>';
+    el('chart-caption').textContent = '';
+    renderTrendTable(series);
+    return;
+  }
+
+  const width = Math.max(canvas.clientWidth || 640, 320);
+  const height = 250;
+  const margin = { top: 16, right: 60, bottom: 26, left: 56 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+
+  const values = points.map((p) => p.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const pad = Math.max((rawMax - rawMin) * 0.15, rawMax * 0.01);
+  const yMin = rawMin - pad;
+  const yMax = rawMax + pad;
+
+  const x = (i) => margin.left + (points.length === 1 ? plotWidth / 2 : (i / (points.length - 1)) * plotWidth);
+  const y = (v) => margin.top + plotHeight - ((v - yMin) / (yMax - yMin)) * plotHeight;
+
+  const ticks = niceTicks(yMin, yMax, 4);
+  const minPoint = points.reduce((a, b) => (b.value < a.value ? b : a));
+  const minIndex = points.indexOf(minPoint);
+  const lastIndex = points.length - 1;
+
+  const gridMarkup = ticks
+    .map(
+      (tick) =>
+        `<line class="grid-line" x1="${margin.left}" x2="${margin.left + plotWidth}" y1="${y(tick).toFixed(1)}" y2="${y(tick).toFixed(1)}"></line>` +
+        `<text class="axis-label axis-label--num" x="${margin.left - 8}" y="${(y(tick) + 4).toFixed(1)}" text-anchor="end">${czkShort(tick)}</text>`,
+    )
+    .join('');
+
+  const everyNth = Math.max(1, Math.ceil(points.length / Math.max(3, Math.floor(plotWidth / 70))));
+  const xLabels = points
+    .map((p, i) =>
+      i % everyNth === 0 || i === lastIndex
+        ? `<text class="axis-label" x="${x(i).toFixed(1)}" y="${height - 6}" text-anchor="middle">${dayMonth(p.date)}</text>`
+        : '',
+    )
+    .join('');
+
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+
+  const lastValue = points[lastIndex].value;
+  const labels = [
+    `<circle class="series-dot" cx="${x(lastIndex).toFixed(1)}" cy="${y(lastValue).toFixed(1)}" r="4.5"></circle>`,
+    `<text class="endpoint-label" x="${(x(lastIndex) + 9).toFixed(1)}" y="${(y(lastValue) + 4).toFixed(1)}">${czk(lastValue)}</text>`,
+  ];
+  if (minIndex !== lastIndex) {
+    const anchor = x(minIndex) > margin.left + plotWidth * 0.75 ? 'end' : 'middle';
+    labels.push(
+      `<circle class="series-dot series-dot--deal" cx="${x(minIndex).toFixed(1)}" cy="${y(minPoint.value).toFixed(1)}" r="4.5"></circle>`,
+      `<text class="axis-label axis-label--num" x="${x(minIndex).toFixed(1)}" y="${(y(minPoint.value) + 18).toFixed(1)}" text-anchor="${anchor}">min ${czkShort(minPoint.value)}</text>`,
+    );
+  }
+
+  canvas.innerHTML = `
+<svg viewBox="0 0 ${width} ${height}" role="img" tabindex="0"
+     aria-label="Vývoj nejnižší ceny za posledních ${points.length} dní, od ${czk(points[0].value)} do ${czk(lastValue)}.">
+  ${gridMarkup}
+  ${xLabels}
+  <g id="crosshair-group" hidden>
+    <line class="crosshair" y1="${margin.top}" y2="${margin.top + plotHeight}" x1="0" x2="0"></line>
+    <circle class="series-dot" r="5" cx="0" cy="0"></circle>
+  </g>
+  <path class="series-line" d="${path}"></path>
+  ${labels.join('')}
+  <rect class="hit-area" x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}"></rect>
+</svg>`;
+
+  el('chart-caption').textContent =
+    `Každý bod je nejnižší nalezená cena daného dne. Filtr přestupů se do grafu nepromítá – historie si pamatuje jen nejnižší cenu na trase.`;
+
+  attachChartInteraction(canvas.querySelector('svg'), points, { x, y, margin, plotWidth });
+  renderTrendTable(series);
+}
+
+function attachChartInteraction(svg, points, geometry) {
+  const group = svg.querySelector('#crosshair-group');
+  const line = group.querySelector('line');
+  const dot = group.querySelector('circle');
+  const tooltip = el('tooltip');
+  let activeIndex = null;
+
+  const show = (index) => {
+    if (index === null || !points[index]) return;
+    activeIndex = index;
+    const point = points[index];
+    const px = geometry.x(index);
+    const py = geometry.y(point.value);
+    line.setAttribute('x1', px);
+    line.setAttribute('x2', px);
+    dot.setAttribute('cx', px);
+    dot.setAttribute('cy', py);
+    group.removeAttribute('hidden');
+
+    tooltip.innerHTML =
+      `<strong>${czk(point.value)}</strong><br>` +
+      `<span class="tooltip__row">${dayMonthYear(point.date)} · ${point.count} tras s nabídkou</span>`;
+    tooltip.hidden = false;
+
+    const rect = svg.getBoundingClientRect();
+    const scale = rect.width / svg.viewBox.baseVal.width;
+    const anchorX = rect.left + px * scale;
+    const anchorY = rect.top + py * scale;
+    const box = tooltip.getBoundingClientRect();
+    tooltip.style.left = `${Math.min(Math.max(8, anchorX - box.width / 2), window.innerWidth - box.width - 8)}px`;
+    // nad bodem, a když by vyjel nad okno, tak pod ním
+    const above = anchorY - box.height - 16;
+    tooltip.style.top = `${above < 8 ? anchorY + 18 : above}px`;
+  };
+
+  const hide = () => {
+    activeIndex = null;
+    group.setAttribute('hidden', '');
+    tooltip.hidden = true;
+  };
+
+  const indexFromEvent = (event) => {
+    const rect = svg.getBoundingClientRect();
+    const scale = svg.viewBox.baseVal.width / rect.width;
+    const svgX = (event.clientX - rect.left) * scale;
+    const ratio = (svgX - geometry.margin.left) / geometry.plotWidth;
+    return Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
+  };
+
+  svg.addEventListener('pointermove', (event) => show(indexFromEvent(event)));
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('blur', hide);
+  svg.addEventListener('focus', () => show(points.length - 1));
+  svg.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const base = activeIndex ?? points.length - 1;
+    show(Math.min(points.length - 1, Math.max(0, base + (event.key === 'ArrowRight' ? 1 : -1))));
+  });
+}
+
+function renderTrendTable(series) {
+  const body = el('trend-table').querySelector('tbody');
+  body.innerHTML = series
+    .slice()
+    .reverse()
+    .map(
+      (point) =>
+        `<tr><td>${dayMonthYear(point.date)}</td><td class="num">${point.value === null ? '—' : czk(point.value)}</td><td class="num">${point.count}</td></tr>`,
+    )
+    .join('');
+}
+
+/* ---------- sloupce podle destinace ---------- */
+
+function renderDestinationBars() {
+  const container = el('dest-bars');
+  const byDestination = new Map();
+  for (const offer of currentOffers()) {
+    const current = byDestination.get(offer.destination);
+    if (!current || offer.priceTotal < current.priceTotal) byDestination.set(offer.destination, offer);
+  }
+  const rows = [...byDestination.values()].sort((a, b) => a.priceTotal - b.priceTotal);
+  if (!rows.length) {
+    container.innerHTML = '<p class="empty">Žádná data pro zvolené filtry.</p>';
+    return;
+  }
+  const max = rows.at(-1).priceTotal;
+  container.innerHTML = rows
+    .map((offer) => {
+      const width = Math.max(4, (offer.priceTotal / max) * 100);
+      return `<div class="bar-row">
+  <span class="bar-row__name">${offer.isDeal ? '💣 ' : ''}${cityName(offer.destination)} <span class="muted">· ${cityName(offer.origin)}</span></span>
+  <span class="bar-row__value">${czk(offer.priceTotal)}</span>
+  <span class="bar-row__track"><span class="bar-row__fill${offer.isDeal ? ' bar-row__fill--deal' : ''}" style="width:${width.toFixed(1)}%"></span></span>
+</div>`;
+    })
+    .join('');
+}
+
+/* ---------- tabulka nabídek ---------- */
+
+function renderTable(offers) {
+  const body = el('offers-body');
+  const shown = offers.slice(0, state.limit);
+
+  el('offers-empty').hidden = offers.length > 0;
+  el('offers-more').hidden = offers.length <= state.limit;
+  el('offers-more').textContent = `Zobrazit dalších ${Math.min(100, offers.length - state.limit)}`;
+  el('table-sub').textContent =
+    offers.length === 0
+      ? 'nic nenalezeno'
+      : `${shown.length} z ${offers.length} nabídek${state.filters.bestPerRoute ? ' · jen nejlevnější termín pro každou trasu' : ''}`;
+
+  body.innerHTML = shown
+    .map((offer) => {
+      const transfers =
+        offer.transfers === null || offer.transfers === undefined
+          ? '—'
+          : offer.transfers === 0
+            ? 'přímý'
+            : `${offer.transfers}×`;
+      const flightTime = duration(offer.durationTo);
+      // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
+      let deal;
+      if (offer.dealPct === null || offer.dealPct === undefined) {
+        deal = '<span class="muted">—</span>';
+      } else {
+        const main = offer.isDeal
+          ? `<span class="badge">💣 cenová bomba −${offer.dealPct} %</span>`
+          : `<span class="muted">${offer.dealPct > 0 ? '−' : '+'}${Math.abs(offer.dealPct)} %</span>`;
+        const low = offer.isAllTimeLow ? '<span class="badge">↓ nové minimum</span>' : '';
+        deal = low ? `<span class="badges">${main}${low}</span>` : main;
+      }
+
+      return `<tr>
+  <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
+  <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted">tam ${flightTime}</small>` : ''}</td>
+  <td data-col="price" class="num price">${czk(offer.priceTotal)}</td>
+  <td data-col="perPerson" class="num muted">${czk(offer.pricePerPerson)}</td>
+  <td data-col="airline">${offer.airlineName ?? '—'}</td>
+  <td data-col="transfers" class="num">${transfers}</td>
+  <td data-col="deal" class="num">${deal}</td>
+  <td data-col="link"><a class="book" href="${offer.link}" target="_blank" rel="noopener noreferrer">rezervovat ↗</a></td>
+</tr>`;
+    })
+    .join('');
+}
+
+function renderErrors() {
+  const errors = state.latest.errors ?? [];
+  el('errors-card').hidden = errors.length === 0;
+  if (!errors.length) return;
+  el('errors-sub').textContent = `${state.latest.stats.errors} chyb při posledním běhu (zobrazeno max. 20)`;
+  el('errors-list').innerHTML = errors
+    .slice(0, 20)
+    .map((error) => `<li>${error.route} ${error.departureDate} / ${error.returnDate}: ${error.message}</li>`)
+    .join('');
+}
+
+init();

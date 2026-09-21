@@ -1,0 +1,18 @@
+{
+  "name": "letenky",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Statická microsite pro denní sledování cen letenek do jihovýchodní Asie.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "fetch": "node scripts/fetch-prices.mjs",
+    "fetch:mock": "node scripts/fetch-prices.mjs --mock",
+    "fetch:sample": "node scripts/fetch-prices.mjs --sample --verbose",
+    "notify": "node scripts/notify.mjs",
+    "notify:dry": "node scripts/notify.mjs --dry-run",
+    "seed:demo": "node scripts/seed-demo.mjs 14",
+    "seed:clean": "node scripts/seed-demo.mjs --clean",
+    "serve": "npx --yes serve ."
+  }
+}

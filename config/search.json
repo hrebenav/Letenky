@@ -1,0 +1,40 @@
+{
+  "$comment": "Jediné místo, kde se mění parametry hledání. Po úpravě commitni – workflow si to načte při dalším běhu.",
+  "currency": "czk",
+  "passengers": 2,
+  "market": "cz",
+  "origins": [
+    { "code": "PRG", "name": "Praha" },
+    { "code": "VIE", "name": "Vídeň" },
+    { "code": "MUC", "name": "Mnichov" },
+    { "code": "BTS", "name": "Bratislava" },
+    { "code": "DRS", "name": "Drážďany" }
+  ],
+  "destinations": [
+    { "code": "KUL", "name": "Kuala Lumpur", "country": "Malajsie" },
+    { "code": "MNL", "name": "Manila", "country": "Filipíny" },
+    { "code": "HAN", "name": "Hanoj", "country": "Vietnam" },
+    { "code": "SGN", "name": "Ho Či Minovo Město", "country": "Vietnam" },
+    { "code": "SIN", "name": "Singapur", "country": "Singapur" },
+    { "code": "PNH", "name": "Phnom Penh", "country": "Kambodža" },
+    { "code": "SAI", "name": "Siem Reap", "country": "Kambodža" },
+    { "code": "CEB", "name": "Cebu", "country": "Filipíny" }
+  ],
+  "departureDates": ["2026-12-26", "2026-12-27", "2026-12-28"],
+  "returnDates": ["2027-01-07", "2027-01-08", "2027-01-09", "2027-01-10", "2027-01-11"],
+  "alerts": {
+    "thresholdPct": 15,
+    "minHistoryDays": 3,
+    "maxEmailsPerRun": 10
+  },
+  "history": {
+    "trendDays": 28,
+    "baselineDays": 60
+  },
+  "fetch": {
+    "concurrency": 5,
+    "retries": 3,
+    "timeoutMs": 20000,
+    "monthFallback": true
+  }
+}

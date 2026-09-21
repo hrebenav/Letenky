@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="cs" data-palette="#2a78d6,#0ca30c">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Letenky do jihovýchodní Asie</title>
+<meta name="description" content="Denní sledování cen letenek z Prahy, Vídně, Mnichova, Bratislavy a Drážďan do jihovýchodní Asie, Vánoce 2026 / Nový rok 2027.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header__text">
+    <h1>Letenky do jihovýchodní Asie</h1>
+    <p class="page-header__sub" id="subtitle">Načítám data…</p>
+  </div>
+  <button type="button" id="theme-toggle" class="icon-button" aria-label="Přepnout světlý/tmavý režim" title="Přepnout světlý/tmavý režim">
+    <span aria-hidden="true" id="theme-icon">◐</span>
+  </button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main id="app" aria-busy="true">
+
+  <section class="tiles" aria-label="Souhrn">
+    <article class="tile tile--hero">
+      <h2 class="tile__label">Nejlevnější dnes</h2>
+      <p class="tile__value" id="kpi-today-value">—</p>
+      <p class="tile__note" id="kpi-today-note">za 2 osoby zpáteční</p>
+    </article>
+    <article class="tile">
+      <h2 class="tile__label">Nejlevnější za sledované období</h2>
+      <p class="tile__value tile__value--sm" id="kpi-alltime-value">—</p>
+      <p class="tile__note" id="kpi-alltime-note">—</p>
+    </article>
+    <article class="tile">
+      <h2 class="tile__label">Průměr denních minim</h2>
+      <p class="tile__value tile__value--sm" id="kpi-avg-value">—</p>
+      <p class="tile__note" id="kpi-avg-note">—</p>
+    </article>
+    <article class="tile">
+      <h2 class="tile__label">Pokrytí dnešního běhu</h2>
+      <p class="tile__value tile__value--sm" id="kpi-coverage-value">—</p>
+      <p class="tile__note" id="kpi-coverage-note">—</p>
+    </article>
+  </section>
+
+  <section class="filters" aria-label="Filtry">
+    <div class="filters__group">
+      <span class="filters__label" id="label-origins">Odlet z</span>
+      <div class="chips" id="filter-origins" role="group" aria-labelledby="label-origins"></div>
+    </div>
+    <div class="filters__group">
+      <span class="filters__label" id="label-destinations">Cíl</span>
+      <div class="chips" id="filter-destinations" role="group" aria-labelledby="label-destinations"></div>
+    </div>
+    <div class="filters__row">
+      <label class="field">
+        <span>Max. přestupů</span>
+        <select id="filter-transfers">
+          <option value="">bez omezení</option>
+          <option value="0">přímý let</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Řazení</span>
+        <select id="filter-sort">
+          <option value="price">nejlevnější</option>
+          <option value="deal">největší sleva</option>
+          <option value="departure">datum odletu</option>
+          <option value="route">trasa</option>
+        </select>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="filter-best-per-route" checked>
+        <span>Jen nejlevnější termín pro každou trasu</span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="filter-deals-only">
+        <span>Jen cenové bomby</span>
+      </label>
+      <button type="button" class="reset-button" id="filter-reset">Zrušit filtry</button>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card card--chart" aria-labelledby="chart-title">
+      <div class="card__head">
+        <h2 id="chart-title">Vývoj nejnižší ceny</h2>
+        <p class="card__sub" id="chart-sub">za 2 osoby, podle vybraných tras</p>
+      </div>
+      <figure class="chart" id="chart">
+        <div class="chart__canvas" id="chart-canvas"></div>
+        <figcaption class="chart__caption" id="chart-caption"></figcaption>
+      </figure>
+      <details class="table-view">
+        <summary>Zobrazit jako tabulku</summary>
+        <div class="table-scroll">
+          <table class="mini-table" id="trend-table">
+            <caption class="sr-only">Nejnižší denní cena pro vybrané trasy</caption>
+            <thead><tr><th scope="col">Datum</th><th scope="col" class="num">Nejnižší cena</th><th scope="col" class="num">Nabídek</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section class="card" aria-labelledby="dest-title">
+      <div class="card__head">
+        <h2 id="dest-title">Nejlevnější podle destinace</h2>
+        <p class="card__sub">dnešní minimum za 2 osoby</p>
+      </div>
+      <div class="bars" id="dest-bars"></div>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="table-title">
+    <div class="card__head card__head--row">
+      <div>
+        <h2 id="table-title">Nabídky</h2>
+        <p class="card__sub" id="table-sub">—</p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="offers" id="offers-table">
+        <caption class="sr-only">Nalezené nabídky letenek seřazené podle ceny</caption>
+        <thead>
+          <tr>
+            <th scope="col">Trasa</th>
+            <th scope="col">Termín</th>
+            <th scope="col" class="num">Cena za 2 os.</th>
+            <th scope="col" class="num">Za osobu</th>
+            <th scope="col">Aerolinka</th>
+            <th scope="col" class="num">Přestupy</th>
+            <th scope="col" class="num">vs. průměr</th>
+            <th scope="col"><span class="sr-only">Rezervace</span></th>
+          </tr>
+        </thead>
+        <tbody id="offers-body"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="offers-empty" hidden>Pro zvolené filtry nejsou žádné nabídky.</p>
+    <button type="button" class="more-button" id="offers-more" hidden>Zobrazit dalších 100</button>
+  </section>
+
+  <section class="card card--muted" id="errors-card" hidden>
+    <div class="card__head">
+      <h2>Kombinace, které se nepodařilo načíst</h2>
+      <p class="card__sub" id="errors-sub"></p>
+    </div>
+    <ul class="errors" id="errors-list"></ul>
+  </section>
+
+</main>
+
+<footer class="page-footer">
+  <p id="footer-source">—</p>
+  <p>Ceny pocházejí z cache vyhledávání Aviasales a nemusí být v danou chvíli dostupné. Před nákupem si cenu vždy ověř kliknutím na odkaz. Cena za 2 osoby je dopočítaná jako dvojnásobek ceny za osobu a nezahrnuje zavazadla ani poplatky za platbu.</p>
+</footer>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
+
+<script src="assets/app.js" type="module"></script>
+</body>
+</html>

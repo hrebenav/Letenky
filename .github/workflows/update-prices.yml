@@ -1,0 +1,81 @@
+name: Denní stahování cen letenek
+
+on:
+  schedule:
+    # 04:10 UTC = 06:10 letního / 05:10 zimního času. Cron v GitHub Actions běží v UTC
+    # a při vytížení se může o pár desítek minut opozdit – u denního běhu to nevadí.
+    - cron: '10 4 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Režim běhu'
+        type: choice
+        default: live
+        options: [live, sample, mock]
+
+# Dva běhy zároveň by si přepsaly commit, proto je řadíme za sebe.
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Na úrovni jobu, aby se na hodnotu dalo odkazovat v `if` jednotlivých kroků.
+    env:
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Doinstalovat nodemailer (jen když se posílá přes SMTP)
+        if: env.SMTP_HOST != ''
+        run: npm install nodemailer --no-save --no-audit --no-fund
+
+      - name: Stáhnout ceny
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+        run: |
+          case "${{ inputs.mode || 'live' }}" in
+            mock)   node scripts/fetch-prices.mjs --mock ;;
+            sample) node scripts/fetch-prices.mjs --sample --verbose ;;
+            *)      node scripts/fetch-prices.mjs ;;
+          esac
+
+      - name: Poslat upozornění na cenovou bombu
+        env:
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: node scripts/notify.mjs
+
+      - name: Uložit data do repozitáře
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if git diff --cached --quiet; then
+            echo 'Data se nezměnila, není co commitovat.'
+            exit 0
+          fi
+          git commit -m "chore(data): ceny $(date -u +%Y-%m-%d)"
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "push selhal, pokus ${attempt}/3"
+            sleep $((attempt * 5))
+          done
+          exit 1
