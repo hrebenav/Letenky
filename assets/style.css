@@ -173,6 +173,8 @@ main[aria-busy="true"] { opacity: 0.55; }
 .series-dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
 .series-dot--deal { fill: var(--good); }
 .endpoint-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.target-line { stroke: var(--good); stroke-width: 1.5; }
+.target-label { fill: var(--good); font-size: 11px; font-weight: 600; }
 .crosshair { stroke: var(--text-muted); stroke-width: 1; }
 /* `hidden` na SVG skupině neskrývá spolehlivě ve všech prohlížečích – doplňujeme explicitně. */
 #crosshair-group[hidden] { display: none; }

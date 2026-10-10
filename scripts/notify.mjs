@@ -34,12 +34,17 @@ async function readJson(file, fallback) {
 
 function pickAlerts(latest, state) {
   const threshold = latest.thresholdPct ?? 15;
+  const target = latest.targetPriceTotal ?? null;
   const now = Date.now();
   const alerts = [];
+
   for (const offer of latest.offers ?? []) {
     const baseline = latest.baselines?.[`${offer.origin}-${offer.destination}`];
-    if (!baseline || offer.vsMinPct === null || offer.vsMinPct === undefined) continue;
-    if (offer.vsMinPct < threshold) continue;
+    const isBomb =
+      baseline && offer.vsMinPct !== null && offer.vsMinPct !== undefined && offer.vsMinPct >= threshold;
+    // Cílová cena nepotřebuje historii – platí od prvního běhu.
+    const isTarget = target !== null && offer.priceTotal <= target;
+    if (!isBomb && !isTarget) continue;
 
     const key = `${offer.origin}-${offer.destination}|${offer.departureDate}|${offer.returnDate}`;
     const previous = state.sent?.[key];
@@ -48,9 +53,15 @@ function pickAlerts(latest, state) {
       const cheaperBy = ((previous.priceTotal - offer.priceTotal) / previous.priceTotal) * 100;
       if (ageDays < RE_ALERT_AFTER_DAYS && cheaperBy < RE_ALERT_IF_CHEAPER_PCT) continue;
     }
-    alerts.push({ key, offer, baseline });
+    alerts.push({ key, offer, baseline: isBomb ? baseline : null, isBomb, isTarget });
   }
-  return alerts.sort((a, b) => b.offer.vsMinPct - a.offer.vsMinPct);
+
+  // Napřed cenové bomby podle velikosti slevy, pak nálezy pod cílovou cenou od nejlevnějšího.
+  return alerts.sort((a, b) => {
+    if (a.isBomb !== b.isBomb) return a.isBomb ? -1 : 1;
+    if (a.isBomb) return b.offer.vsMinPct - a.offer.vsMinPct;
+    return a.offer.priceTotal - b.offer.priceTotal;
+  });
 }
 
 function renderEmail(alerts, latest, siteUrl) {
@@ -60,13 +71,19 @@ function renderEmail(alerts, latest, siteUrl) {
   ]);
   const cityName = (code) => names.get(code) ?? code;
 
+  const bombs = alerts.filter((a) => a.isBomb).length;
+  const targets = alerts.length - bombs;
+
   const rows = alerts
-    .map(({ offer, baseline }) => {
+    .map(({ offer, baseline, isBomb }) => {
       const link = siteUrl ? `<a href="${offer.link}">rezervovat</a>` : offer.link;
+      const why = isBomb
+        ? `<span style="color:#047857;font-weight:600">💣 −${offer.vsMinPct} %</span><br><span style="color:#6b7280;font-size:13px">vs. min. ${czk(baseline.min)}</span>`
+        : `<span style="color:#047857;font-weight:600">🎯 pod cílem</span><br><span style="color:#6b7280;font-size:13px">cíl ${czk(latest.targetPriceTotal)}</span>`;
       return `<tr>
   <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb"><strong>${cityName(offer.origin)} → ${cityName(offer.destination)}</strong><br><span style="color:#6b7280;font-size:13px">${czDate(offer.departureDate)} – ${czDate(offer.returnDate)} · ${offer.airlineName} · ${offer.transfers ?? '?'}× přestup</span></td>
   <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap"><strong style="font-size:16px">${czk(offer.priceTotal)}</strong><br><span style="color:#6b7280;font-size:13px">za ${latest.passengers} osoby</span></td>
-  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap"><span style="color:#047857;font-weight:600">−${offer.vsMinPct} %</span><br><span style="color:#6b7280;font-size:13px">vs. min. ${czk(baseline.min)}</span></td>
+  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">${why}</td>
   <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${link}</td>
 </tr>`;
     })
@@ -74,19 +91,25 @@ function renderEmail(alerts, latest, siteUrl) {
 
   const html = `<!doctype html><html lang="cs"><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f9fafb;padding:24px;margin:0">
 <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
-<h1 style="margin:0 0 4px;font-size:20px">✈️ Cenová bomba na letenky</h1>
-<p style="margin:0 0 20px;color:#6b7280;font-size:14px">${alerts.length}× cena aspoň ${latest.thresholdPct} % pod dosavadním minimem · data z ${new Date(latest.generatedAt).toLocaleString('cs-CZ')}</p>
+<h1 style="margin:0 0 4px;font-size:20px">✈️ ${bombs ? 'Cenová bomba na letenky' : 'Letenky pod tvou cílovou cenou'}</h1>
+<p style="margin:0 0 20px;color:#6b7280;font-size:14px">${[bombs && `${bombs}× aspoň ${latest.thresholdPct} % pod dosavadním minimem`, targets && `${targets}× pod cílem ${czk(latest.targetPriceTotal)}`].filter(Boolean).join(' · ')} · data z ${new Date(latest.generatedAt).toLocaleString('cs-CZ')}</p>
 <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
 ${siteUrl ? `<p style="margin:20px 0 0"><a href="${siteUrl}" style="background:#0f172a;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-size:14px">Otevřít přehled</a></p>` : ''}
 <p style="margin:20px 0 0;color:#9ca3af;font-size:12px">Ceny jsou z cache Aviasales a nemusí být aktuální – před nákupem si je ověř kliknutím na odkaz.</p>
 </div></body></html>`;
 
   const text = alerts
-    .map(({ offer, baseline }) => `${cityName(offer.origin)} → ${cityName(offer.destination)} ${czDate(offer.departureDate)}–${czDate(offer.returnDate)}: ${czk(offer.priceTotal)} za ${latest.passengers} osoby (−${offer.vsMinPct} % vs. minimum ${czk(baseline.min)})\n${offer.link}`)
+    .map(({ offer, baseline, isBomb }) => {
+      const why = isBomb
+        ? `−${offer.vsMinPct} % vs. minimum ${czk(baseline.min)}`
+        : `pod cílovou cenou ${czk(latest.targetPriceTotal)}`;
+      return `${cityName(offer.origin)} → ${cityName(offer.destination)} ${czDate(offer.departureDate)}–${czDate(offer.returnDate)}: ${czk(offer.priceTotal)} za ${latest.passengers} osoby (${why})\n${offer.link}`;
+    })
     .join('\n\n');
 
-  const cheapest = alerts[0].offer;
-  const subject = `✈️ ${czk(cheapest.priceTotal)} ${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} (−${cheapest.vsMinPct} %)${alerts.length > 1 ? ` a ${alerts.length - 1} další` : ''}`;
+  const first = alerts[0];
+  const mark = first.isBomb ? `−${first.offer.vsMinPct} %` : 'pod cílem';
+  const subject = `${first.isBomb ? '💣' : '🎯'} ${czk(first.offer.priceTotal)} ${cityName(first.offer.origin)} → ${cityName(first.offer.destination)} (${mark})${alerts.length > 1 ? ` a ${alerts.length - 1} další` : ''}`;
   return { subject, html, text };
 }
 
@@ -146,10 +169,13 @@ async function main() {
   const maxPerRun = config?.alerts?.maxEmailsPerRun ?? 10;
   const alerts = pickAlerts(latest, state).slice(0, maxPerRun);
   if (!alerts.length) {
-    console.log('notify: žádná nová cenová bomba.');
+    console.log('notify: žádný nový nález k odeslání.');
     return;
   }
-  console.log(`notify: ${alerts.length} nových nálezů pod historickým minimem.`);
+  console.log(
+    `notify: ${alerts.length} nových nálezů (${alerts.filter((a) => a.isBomb).length}× cenová bomba, ` +
+      `${alerts.filter((a) => !a.isBomb).length}× pod cílovou cenou).`,
+  );
 
   const to = process.env.ALERT_EMAIL_TO;
   const message = renderEmail(alerts, latest, process.env.SITE_URL || '');

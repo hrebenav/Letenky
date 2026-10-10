@@ -334,8 +334,11 @@ function renderChart() {
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const pad = Math.max((rawMax - rawMin) * 0.15, rawMax * 0.01);
-  const yMin = rawMin - pad;
-  const yMax = rawMax + pad;
+  // Cílovou cenu zobrazíme jen když je v dohledu – jinak by zploštila celou křivku.
+  const target = state.latest.targetPriceTotal ?? null;
+  const showTarget = target !== null && target > rawMin * 0.65 && target < rawMax * 1.35;
+  const yMin = showTarget ? Math.min(rawMin - pad, target - pad * 0.6) : rawMin - pad;
+  const yMax = showTarget ? Math.max(rawMax + pad, target + pad * 0.6) : rawMax + pad;
 
   const x = (i) => margin.left + (points.length === 1 ? plotWidth / 2 : (i / (points.length - 1)) * plotWidth);
   const y = (v) => margin.top + plotHeight - ((v - yMin) / (yMax - yMin)) * plotHeight;
@@ -362,6 +365,11 @@ function renderChart() {
     )
     .join('');
 
+  const targetMarkup = showTarget
+    ? `<line class="target-line" x1="${margin.left}" x2="${margin.left + plotWidth}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}"></line>` +
+      `<text class="target-label" x="${(margin.left + plotWidth + 6).toFixed(1)}" y="${(y(target) + 4).toFixed(1)}">cíl</text>`
+    : '';
+
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
 
   const lastValue = points[lastIndex].value;
@@ -381,6 +389,7 @@ function renderChart() {
 <svg viewBox="0 0 ${width} ${height}" role="img" tabindex="0"
      aria-label="Vývoj nejnižší ceny za posledních ${points.length} dní, od ${czk(points[0].value)} do ${czk(lastValue)}.">
   ${gridMarkup}
+  ${targetMarkup}
   ${xLabels}
   <g id="crosshair-group" hidden>
     <line class="crosshair" y1="${margin.top}" y2="${margin.top + plotHeight}" x1="0" x2="0"></line>
@@ -392,7 +401,8 @@ function renderChart() {
 </svg>`;
 
   el('chart-caption').textContent =
-    `Každý bod je nejnižší nalezená cena daného dne. Filtr přestupů se do grafu nepromítá – historie si pamatuje jen nejnižší cenu na trase.`;
+    (showTarget ? `Vodorovná čára je tvoje cílová cena ${czk(target)}. ` : '') +
+    'Každý bod je nejnižší nalezená cena daného dne. Filtr přestupů se do grafu nepromítá – historie si pamatuje jen nejnižší cenu na trase.';
 
   attachChartInteraction(canvas.querySelector('svg'), points, { x, y, margin, plotWidth });
   renderTrendTable(series);
@@ -507,10 +517,13 @@ function renderTable(offers) {
   el('offers-empty').hidden = offers.length > 0;
   el('offers-more').hidden = offers.length <= state.limit;
   el('offers-more').textContent = `Zobrazit dalších ${Math.min(100, offers.length - state.limit)}`;
+  const underTarget = offers.filter((o) => o.underTarget).length;
   el('table-sub').textContent =
     offers.length === 0
       ? 'nic nenalezeno'
-      : `${shown.length} z ${offers.length} nabídek${state.filters.bestPerRoute ? ' · jen nejlevnější termín pro každou trasu' : ''}`;
+      : `${shown.length} z ${offers.length} nabídek` +
+        (state.filters.bestPerRoute ? ' · jen nejlevnější termín pro každou trasu' : '') +
+        (underTarget ? ` · ${underTarget} pod cílovou cenou ${czk(state.latest.targetPriceTotal)}` : '');
 
   body.innerHTML = shown
     .map((offer) => {
@@ -524,13 +537,14 @@ function renderTable(offers) {
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
       if (offer.dealPct === null || offer.dealPct === undefined) {
-        deal = '<span class="muted">—</span>';
+        deal = offer.underTarget ? '<span class="badge">🎯 pod cílem</span>' : '<span class="muted">—</span>';
       } else {
         const main = offer.isDeal
           ? `<span class="badge">💣 cenová bomba −${offer.dealPct} %</span>`
           : `<span class="muted">${offer.dealPct > 0 ? '−' : '+'}${Math.abs(offer.dealPct)} %</span>`;
         const low = offer.isAllTimeLow ? '<span class="badge">↓ nové minimum</span>' : '';
-        deal = low ? `<span class="badges">${main}${low}</span>` : main;
+        const target = offer.underTarget ? '<span class="badge">🎯 pod cílem</span>' : '';
+        deal = low || target ? `<span class="badges">${main}${low}${target}</span>` : main;
       }
 
       return `<tr>

@@ -37,7 +37,12 @@ export function createProvider({
   retries = 3,
   logger = console,
 }) {
-  if (!token) throw new Error('Chybí TRAVELPAYOUTS_TOKEN.');
+  if (!token) {
+    throw new Error(
+      'Chybí TRAVELPAYOUTS_TOKEN. Na GitHubu ho vlož do Settings → Secrets and variables → ' +
+        'Actions → New repository secret pod názvem TRAVELPAYOUTS_TOKEN. Lokálně: export TRAVELPAYOUTS_TOKEN=...',
+    );
+  }
 
   let requestCount = 0;
 

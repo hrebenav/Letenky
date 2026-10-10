@@ -23,6 +23,8 @@
   "departureDates": ["2026-12-26", "2026-12-27", "2026-12-28"],
   "returnDates": ["2027-01-07", "2027-01-08", "2027-01-09", "2027-01-10", "2027-01-11"],
   "alerts": {
+    "$comment": "targetPriceTotal = cílová cena za celou partu v CZK. Jakmile ji vyplníš, chodí mail i bez historie, hned jak nějaká nabídka spadne pod ni. null = vypnuto.",
+    "targetPriceTotal": null,
     "thresholdPct": 15,
     "minHistoryDays": 3,
     "maxEmailsPerRun": 10

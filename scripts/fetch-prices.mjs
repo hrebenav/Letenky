@@ -235,6 +235,12 @@ async function main() {
     minHistoryDays: config.alerts.minHistoryDays,
   });
 
+  // Cílová cena funguje nezávisle na historii – použitelná od prvního běhu.
+  const targetPriceTotal = config.alerts.targetPriceTotal ?? null;
+  for (const offer of annotated) {
+    offer.underTarget = targetPriceTotal !== null && offer.priceTotal <= targetPriceTotal;
+  }
+
   const todaySnapshot = { date: today, offers: annotated };
   const trend = buildTrend(historyWithoutToday, todaySnapshot, config.history.trendDays);
 
@@ -245,6 +251,7 @@ async function main() {
     currency: config.currency.toUpperCase(),
     passengers: config.passengers,
     thresholdPct: config.alerts.thresholdPct,
+    targetPriceTotal,
     source: MOCK ? 'demo generátor (bez API)' : 'Travelpayouts / Aviasales Data API (cachované ceny)',
     stats: {
       combinations: tasks.length,

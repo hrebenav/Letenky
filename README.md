@@ -103,10 +103,20 @@ jako tlačítko v e-mailu s upozorněním.
 > **Pozor:** naplánované workflow (`schedule`) běží v GitHub Actions jen z výchozí
 > větve repozitáře. Soubory proto musí zůstat na `main`.
 
-### Krok 5 – E-mailová upozornění  *(volitelné)*
+### Krok 5 – E-mailová upozornění  *(volitelné, ale doporučené)*
 
-Upozornění se pošle, když se objeví cena aspoň **15 % pod dosavadním minimem** dané trasy.
-Stejný nález ti nepřijde znovu dřív než za týden (nebo dokud nezlevní o další 3 %).
+Mail chodí ze dvou důvodů:
+
+1. **💣 cenová bomba** – cena aspoň **15 % pod dosavadním minimem** dané trasy.
+   Potřebuje aspoň pár dní historie, takže první dny se neozve.
+2. **🎯 cílová cena** – jakákoli nabídka pod částkou, kterou si nastavíš v
+   `config/search.json` → `alerts.targetPriceTotal` (cena **za celou partu**, v CZK).
+   **Funguje od prvního běhu, historii nepotřebuje** – pokud startuješ pozdě a nemáš
+   čas čekat na trend, je tohle to důležitější ze dvou upozornění.
+
+Dej tam číslo, za které bys to reálně koupila, ne vysněné – při příliš štědrém cíli
+ti první den přijde mail s deseti nabídkami. Stejný nález se neopakuje dřív než
+za týden (nebo dokud nezlevní o další 3 %).
 
 **Varianta A – Resend (doporučeno, nic se neinstaluje):**
 
@@ -205,17 +215,22 @@ se běh protáhne na zhruba 10 minut, což je pořád v pohodě.
 
 ---
 
-## 5. Jak se pozná „cenová bomba"
+## 5. Jak se pozná dobrá cena
 
 Skript si pro každou trasu drží **historii denních minim**. Z ní počítá průměr a minimum
 (minimálně po 3 dnech historie – dřív se nic nevyhodnocuje):
 
-- **badge 💣 na stránce** – cena je 15 % a víc pod historickým **průměrem** dané trasy;
-- **„↓ nové minimum"** – cena je nižší než cokoli, co bylo na téhle trase dosud vidět;
-- **e-mail** – cena je 15 % a víc pod dosavadním **minimem**. To je přísnější podmínka,
-  aby ti nechodila pošta kvůli běžnému kolísání.
+| Označení | Co znamená | Potřebuje historii? |
+|---|---|---|
+| **💣 cenová bomba** | 15 % a víc pod historickým **průměrem** trasy | ano, ≥ 3 dny |
+| **↓ nové minimum** | levnější než cokoli, co na téhle trase dosud bylo vidět | ano, ≥ 3 dny |
+| **🎯 pod cílem** | pod `alerts.targetPriceTotal` (cena za celou partu) | **ne** |
 
-Práh se mění v `config/search.json` → `alerts.thresholdPct`.
+E-mail chodí při **💣** (tam je podmínka přísnější – 15 % pod dosavadním *minimem*, ne
+průměrem, aby nechodila pošta kvůli běžnému kolísání) a při **🎯**.
+Cílová cena se navíc kreslí do grafu jako vodorovná čára.
+
+Obojí se nastavuje v `config/search.json` → `alerts.thresholdPct` a `alerts.targetPriceTotal`.
 
 ---
 
