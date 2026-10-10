@@ -1,6 +1,8 @@
 // Microsite čte jen statické JSON soubory, které vygeneroval scripts/fetch-prices.mjs.
 // Žádný backend, žádné knihovny – graf je ručně kreslené inline SVG.
 
+import { destinationArt, accentFor } from './destinations.mjs';
+
 const el = (id) => document.getElementById(id);
 
 const state = {
@@ -80,11 +82,15 @@ function showBanner(html, variant) {
   banner.hidden = false;
 }
 
+// Běh je naplánovaný jednou denně; 36 h dává rezervu na zpoždění cronu v Actions.
+const STALE_AFTER_HOURS = 36;
+
 /* ---------- hlavička a filtry ---------- */
 
 function renderHeader() {
   const { latest } = state;
   const generated = new Date(latest.generatedAt);
+  const ageHours = (Date.now() - generated.getTime()) / 3_600_000;
   const dep = latest.config.departureDates;
   const ret = latest.config.returnDates;
   el('subtitle').textContent =
@@ -96,6 +102,16 @@ function renderHeader() {
   if (latest.mode === 'demo') {
     showBanner(
       '<strong>Ukázková data.</strong> Tenhle běh proběhl v demo režimu bez připojení k API – čísla jsou vymyšlená a slouží jen k ukázce vzhledu. Po nastavení tokenu se stránka naplní reálnými cenami.',
+      'warn',
+    );
+  } else if (ageHours > STALE_AFTER_HOURS) {
+    // Denní úloha umí selhat tiše celé týdny (stalo se: 19 běhů v řadě).
+    // Stránka je jediné místo, kam se člověk dívá, tak ať je to vidět tady.
+    const days = Math.floor(ageHours / 24);
+    const age = days >= 1 ? `${days} ${days === 1 ? 'den' : days < 5 ? 'dny' : 'dní'}` : `${Math.round(ageHours)} hodin`;
+    showBanner(
+      `<strong>Data jsou stará ${age}.</strong> Denní úloha zřejmě neproběhla – zkontroluj záložku ` +
+      '<em>Actions</em> v GitHub repozitáři, jestli poslední běh neskončil chybou.',
       'warn',
     );
   } else if (latest.stats.errors > 0) {
@@ -484,7 +500,7 @@ function renderTrendTable(series) {
 /* ---------- sloupce podle destinace ---------- */
 
 function renderDestinationBars() {
-  const container = el('dest-bars');
+  const container = el('dest-cards');
   const byDestination = new Map();
   for (const offer of currentOffers()) {
     const current = byDestination.get(offer.destination);
@@ -495,17 +511,57 @@ function renderDestinationBars() {
     container.innerHTML = '<p class="empty">Žádná data pro zvolené filtry.</p>';
     return;
   }
-  const max = rows.at(-1).priceTotal;
-  container.innerHTML = rows
-    .map((offer) => {
-      const width = Math.max(4, (offer.priceTotal / max) * 100);
-      return `<div class="bar-row">
-  <span class="bar-row__name">${offer.isDeal ? '💣 ' : ''}${cityName(offer.destination)} <span class="muted">· ${cityName(offer.origin)}</span></span>
-  <span class="bar-row__value">${czk(offer.priceTotal)}</span>
-  <span class="bar-row__track"><span class="bar-row__fill${offer.isDeal ? ' bar-row__fill--deal' : ''}" style="width:${width.toFixed(1)}%"></span></span>
-</div>`;
-    })
-    .join('');
+
+  const cheapest = rows[0].priceTotal;
+  container.innerHTML = rows.map((offer) => card(offer, cheapest)).join('');
+
+  // Klik na kartu = filtr na tu destinaci. Druhý klik filtr zase sundá.
+  for (const node of container.querySelectorAll('.dest-card')) {
+    node.addEventListener('click', () => {
+      const code = node.dataset.code;
+      const chip = document.querySelector(`#filter-destinations [data-value="${code}"]`);
+      if (chip) chip.click();
+      else {
+        state.filters.destinations.has(code)
+          ? state.filters.destinations.delete(code)
+          : state.filters.destinations.add(code);
+        render();
+      }
+    });
+  }
+}
+
+function countryOf(code) {
+  return state.latest.config.destinations.find((d) => d.code === code)?.country ?? '';
+}
+
+function card(offer, cheapest) {
+  const accent = accentFor(offer.destination);
+  const active = state.filters.destinations.has(offer.destination);
+  const diff = offer.priceTotal - cheapest;
+
+  const flags = [];
+  if (offer.isDeal) flags.push('<span class="pill pill--deal">💣 cenová bomba</span>');
+  if (offer.underTarget) flags.push('<span class="pill pill--target">🎯 pod cílem</span>');
+  if (!flags.length && diff === 0) flags.push('<span class="pill pill--best">nejlevnější dnes</span>');
+
+  const transfers = offer.transfers === 0
+    ? 'přímý let'
+    : `${offer.transfers}× přestup`;
+
+  return `<article class="dest-card${active ? ' is-active' : ''}" data-code="${offer.destination}"
+    style="--accent-light:${accent.light};--accent-dark:${accent.dark}"
+    tabindex="0" role="button" aria-pressed="${active}"
+    aria-label="${cityName(offer.destination)} od ${czk(offer.priceTotal)} za 2 osoby, filtrovat">
+  <div class="dest-card__media">${destinationArt(offer.destination)}</div>
+  <div class="dest-card__body">
+    <h3 class="dest-card__title">${cityName(offer.destination)}</h3>
+    <p class="dest-card__country">${countryOf(offer.destination)}</p>
+    <p class="dest-card__price">${czk(offer.priceTotal)}</p>
+    <p class="dest-card__meta">z ${cityName(offer.origin)} · ${transfers}</p>
+    <div class="dest-card__flags">${flags.join('')}</div>
+  </div>
+</article>`;
 }
 
 /* ---------- tabulka nabídek ---------- */

@@ -11,6 +11,17 @@
 <body>
 
 <header class="page-header">
+  <svg class="page-header__art" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+    <path class="hero-hill" d="M0 120V86c70-14 120 6 190 2s104-28 180-26 118 24 196 18 126-30 212-26 142 26 222 20v46z"/>
+    <path class="hero-hill hero-hill--far" d="M0 120V96c90-10 150 10 240 8s140-22 232-18 150 22 244 16 150-24 244-18v36z"/>
+    <g class="hero-plane">
+      <path d="M884 40l34-8-10 16 26 4-30 10 4 18-16-14-28 12 12-20-22-6z"/>
+    </g>
+    <circle class="hero-sun" cx="1060" cy="36" r="20"/>
+    <g class="hero-trail">
+      <path d="M560 58c60-16 130-18 196-10" stroke-dasharray="6 10"/>
+    </g>
+  </svg>
   <div class="page-header__text">
     <h1>Letenky do jihovýchodní Asie</h1>
     <p class="page-header__sub" id="subtitle">Načítám data…</p>
@@ -109,14 +120,15 @@
       </details>
     </section>
 
-    <section class="card" aria-labelledby="dest-title">
-      <div class="card__head">
-        <h2 id="dest-title">Nejlevnější podle destinace</h2>
-        <p class="card__sub">dnešní minimum za 2 osoby</p>
-      </div>
-      <div class="bars" id="dest-bars"></div>
-    </section>
   </div>
+
+  <section class="card card--dest" aria-labelledby="dest-title">
+    <div class="card__head">
+      <h2 id="dest-title">Kam se dnes vyplatí letět</h2>
+      <p class="card__sub">nejnižší dnešní cena za 2 osoby · klikni na destinaci a profiltruje se tabulka</p>
+    </div>
+    <div class="dest-grid" id="dest-cards"></div>
+  </section>
 
   <section class="card" aria-labelledby="table-title">
     <div class="card__head card__head--row">
