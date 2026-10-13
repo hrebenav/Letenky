@@ -589,6 +589,10 @@ function renderTable(offers) {
           : offer.transfers === 0
             ? 'přímý'
             : `${offer.transfers}×`;
+      // POZOR: duration_to z API je čistý čas ve vzduchu, ne doba cesty.
+      // U nabídky PRG→HAN se 3 přestupy hlásí API 17 h 10 min, zatímco reálná
+      // cesta trvá 35 h 50 min – zbytek je čekání na přestupech. Popisek to
+      // proto musí říct nahlas, jinak si to každý přečte jako celkovou dobu.
       const flightTime = duration(offer.durationTo);
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
@@ -605,7 +609,7 @@ function renderTable(offers) {
 
       return `<tr>
   <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
-  <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted">tam ${flightTime}</small>` : ''}</td>
+  <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se nepočítá – u víc přestupů bývá reálná cesta i dvakrát delší.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
   <td data-col="price" class="num price">${czk(offer.priceTotal)}</td>
   <td data-col="perPerson" class="num muted">${czk(offer.pricePerPerson)}</td>
   <td data-col="airline">${offer.airlineName ?? '—'}</td>
