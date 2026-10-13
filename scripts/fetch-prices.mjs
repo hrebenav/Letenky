@@ -109,6 +109,7 @@ async function main() {
         market: config.market,
         timeoutMs: config.fetch.timeoutMs,
         retries: config.fetch.retries,
+        requestsPerSecond: config.fetch.requestsPerSecond,
       });
 
   const tasks = [];
