@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-13T07:35:06.265Z",
+ "generatedAt": "2026-10-13T07:29:09.960Z",
  "date": "2026-10-13",
  "mode": "live",
  "currency": "CZK",
@@ -11,9 +11,9 @@
   "combinations": 600,
   "offers": 12,
   "empty": 588,
-  "errors": 0,
-  "requests": 636,
-  "elapsedSeconds": 158.8,
+  "errors": 36,
+  "requests": 708,
+  "elapsedSeconds": 21.4,
   "historyDays": 0
  },
  "config": {
@@ -385,5 +385,222 @@
    "underTarget": false
   }
  ],
- "errors": []
+ "errors": [
+  {
+   "route": "PRG-KUL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-MNL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-SGN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-SIN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-PNH",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-SAI",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "PRG-CEB",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-KUL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-HAN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-SIN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-PNH",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-SAI",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "VIE-CEB",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-MNL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-HAN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-SGN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-SIN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-PNH",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-SAI",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "MUC-CEB",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-KUL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-MNL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-HAN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-SGN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-SIN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-PNH",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-SAI",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "BTS-CEB",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-KUL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-MNL",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-HAN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-SGN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-SIN",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-PNH",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-SAI",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  },
+  {
+   "route": "DRS-CEB",
+   "departureDate": "2026-12",
+   "returnDate": "2027-01",
+   "message": "měsíční fallback: HTTP 429"
+  }
+ ]
 }
