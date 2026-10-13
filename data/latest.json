@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-13T07:29:09.960Z",
+ "generatedAt": "2026-10-13T11:41:28.631Z",
  "date": "2026-10-13",
  "mode": "live",
  "currency": "CZK",
@@ -9,11 +9,11 @@
  "source": "Travelpayouts / Aviasales Data API (cachované ceny)",
  "stats": {
   "combinations": 600,
-  "offers": 12,
-  "empty": 588,
-  "errors": 36,
-  "requests": 708,
-  "elapsedSeconds": 21.4,
+  "offers": 13,
+  "empty": 587,
+  "errors": 35,
+  "requests": 705,
+  "elapsedSeconds": 21.1,
   "historyDays": 0
  },
  "config": {
@@ -138,6 +138,30 @@
    "durationTo": 950,
    "durationBack": 1045,
    "link": "https://www.aviasales.com/search/VIE2812SGN10012",
+   "dealPct": null,
+   "vsMinPct": null,
+   "isDeal": false,
+   "isAllTimeLow": false,
+   "underTarget": false
+  },
+  {
+   "id": "VIE-HAN-2026-12-28-2027-01-09",
+   "origin": "VIE",
+   "destination": "HAN",
+   "departureDate": "2026-12-28",
+   "returnDate": "2027-01-09",
+   "departureAt": "2026-12-28T12:25:00+01:00",
+   "returnAt": "2027-01-09T02:10:00+07:00",
+   "pricePerPerson": 22590,
+   "priceTotal": 45180,
+   "airline": "MU",
+   "airlineName": "China Eastern",
+   "flightNumber": "5064",
+   "transfers": 1,
+   "returnTransfers": 2,
+   "durationTo": 825,
+   "durationBack": 920,
+   "link": "https://www.aviasales.com/search/VIE2812HAN09012",
    "dealPct": null,
    "vsMinPct": null,
    "isDeal": false,
@@ -430,12 +454,6 @@
   },
   {
    "route": "VIE-KUL",
-   "departureDate": "2026-12",
-   "returnDate": "2027-01",
-   "message": "měsíční fallback: HTTP 429"
-  },
-  {
-   "route": "VIE-HAN",
    "departureDate": "2026-12",
    "returnDate": "2027-01",
    "message": "měsíční fallback: HTTP 429"
