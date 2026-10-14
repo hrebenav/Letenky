@@ -1,6 +1,6 @@
 {
- "generatedAt": "2026-10-13T07:29:09.960Z",
- "date": "2026-10-13",
+ "generatedAt": "2026-10-14T09:28:02.876Z",
+ "date": "2026-10-14",
  "mode": "live",
  "currency": "CZK",
  "passengers": 2,
@@ -9,12 +9,12 @@
  "source": "Travelpayouts / Aviasales Data API (cachované ceny)",
  "stats": {
   "combinations": 600,
-  "offers": 12,
-  "empty": 588,
+  "offers": 11,
+  "empty": 589,
   "errors": 36,
   "requests": 708,
-  "elapsedSeconds": 21.4,
-  "historyDays": 0
+  "elapsedSeconds": 26.7,
+  "historyDays": 1
  },
  "config": {
   "origins": [
@@ -94,7 +94,38 @@
    "2027-01-11"
   ]
  },
- "baselines": {},
+ "baselines": {
+  "PRG-HAN": {
+   "days": 1,
+   "avg": 37466,
+   "min": 37466,
+   "minDate": "2026-10-13"
+  },
+  "VIE-SGN": {
+   "days": 1,
+   "avg": 42520,
+   "min": 42520,
+   "minDate": "2026-10-13"
+  },
+  "VIE-HAN": {
+   "days": 1,
+   "avg": 45180,
+   "min": 45180,
+   "minDate": "2026-10-13"
+  },
+  "MUC-KUL": {
+   "days": 1,
+   "avg": 49342,
+   "min": 49342,
+   "minDate": "2026-10-13"
+  },
+  "VIE-MNL": {
+   "days": 1,
+   "avg": 50182,
+   "min": 50182,
+   "minDate": "2026-10-13"
+  }
+ },
  "offers": [
   {
    "id": "PRG-HAN-2026-12-28-2027-01-10",
@@ -138,6 +169,30 @@
    "durationTo": 950,
    "durationBack": 1045,
    "link": "https://www.aviasales.com/search/VIE2812SGN10012",
+   "dealPct": null,
+   "vsMinPct": null,
+   "isDeal": false,
+   "isAllTimeLow": false,
+   "underTarget": false
+  },
+  {
+   "id": "VIE-HAN-2026-12-28-2027-01-09",
+   "origin": "VIE",
+   "destination": "HAN",
+   "departureDate": "2026-12-28",
+   "returnDate": "2027-01-09",
+   "departureAt": "2026-12-28T12:25:00+01:00",
+   "returnAt": "2027-01-09T02:10:00+07:00",
+   "pricePerPerson": 22562,
+   "priceTotal": 45124,
+   "airline": "MU",
+   "airlineName": "China Eastern",
+   "flightNumber": "5064",
+   "transfers": 1,
+   "returnTransfers": 2,
+   "durationTo": 825,
+   "durationBack": 920,
+   "link": "https://www.aviasales.com/search/VIE2812HAN09012",
    "dealPct": null,
    "vsMinPct": null,
    "isDeal": false,
@@ -265,30 +320,6 @@
    "underTarget": false
   },
   {
-   "id": "VIE-MNL-2026-12-27-2027-01-10",
-   "origin": "VIE",
-   "destination": "MNL",
-   "departureDate": "2026-12-27",
-   "returnDate": "2027-01-10",
-   "departureAt": "2026-12-27T09:50:00+01:00",
-   "returnAt": "2027-01-10T19:55:00+08:00",
-   "pricePerPerson": 25091,
-   "priceTotal": 50182,
-   "airline": "PC",
-   "airlineName": "Pegasus Airlines",
-   "flightNumber": "902",
-   "transfers": 3,
-   "returnTransfers": 3,
-   "durationTo": 980,
-   "durationBack": 1060,
-   "link": "https://www.aviasales.com/search/VIE2712MNL10012",
-   "dealPct": null,
-   "vsMinPct": null,
-   "isDeal": false,
-   "isAllTimeLow": false,
-   "underTarget": false
-  },
-  {
    "id": "MUC-KUL-2026-12-27-2027-01-07",
    "origin": "MUC",
    "destination": "KUL",
@@ -306,30 +337,6 @@
    "durationTo": 945,
    "durationBack": 955,
    "link": "https://www.aviasales.com/search/MUC2712KUL07012",
-   "dealPct": null,
-   "vsMinPct": null,
-   "isDeal": false,
-   "isAllTimeLow": false,
-   "underTarget": false
-  },
-  {
-   "id": "VIE-MNL-2026-12-27-2027-01-09",
-   "origin": "VIE",
-   "destination": "MNL",
-   "departureDate": "2026-12-27",
-   "returnDate": "2027-01-09",
-   "departureAt": "2026-12-27T09:50:00+01:00",
-   "returnAt": "2027-01-09T23:05:00+08:00",
-   "pricePerPerson": 26023,
-   "priceTotal": 52046,
-   "airline": "PC",
-   "airlineName": "Pegasus Airlines",
-   "flightNumber": "902",
-   "transfers": 3,
-   "returnTransfers": 2,
-   "durationTo": 980,
-   "durationBack": 1085,
-   "link": "https://www.aviasales.com/search/VIE2712MNL09012",
    "dealPct": null,
    "vsMinPct": null,
    "isDeal": false,
@@ -435,7 +442,7 @@
    "message": "měsíční fallback: HTTP 429"
   },
   {
-   "route": "VIE-HAN",
+   "route": "VIE-MNL",
    "departureDate": "2026-12",
    "returnDate": "2027-01",
    "message": "měsíční fallback: HTTP 429"
