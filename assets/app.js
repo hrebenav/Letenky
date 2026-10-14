@@ -40,6 +40,13 @@ function dayMonth(isoDate) {
 function dayMonthYear(isoDate) {
   return `${dayMonth(isoDate)} ${isoDate.slice(0, 4)}`;
 }
+/** Hodina z ISO časové značky, v místním čase letiště (offset je v datech). */
+function clockTime(iso) {
+  if (!iso) return null;
+  const m = String(iso).match(/T(\d{2}):(\d{2})/);
+  return m ? `${Number(m[1])}:${m[2]}` : null;
+}
+
 function duration(minutes) {
   if (!Number.isFinite(minutes)) return null;
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
@@ -618,6 +625,8 @@ function renderTable(offers) {
       // cesta trvá 35 h 50 min – zbytek je čekání na přestupech. Popisek to
       // proto musí říct nahlas, jinak si to každý přečte jako celkovou dobu.
       const flightTime = duration(offer.durationTo);
+      const depTime = clockTime(offer.departureAt);
+      const retTime = clockTime(offer.returnAt);
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
       if (offer.dealPct === null || offer.dealPct === undefined) {
@@ -633,7 +642,7 @@ function renderTable(offers) {
 
       return `<tr>
   <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
-  <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se nepočítá – u víc přestupů bývá reálná cesta i dvakrát delší.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
+  <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se do něj nepočítá a API čas příletu neposílá, takže skutečná doba cesty tu být nemůže – u víc přestupů bývá i dvojnásobná. Reálný čas uvidíš po prokliku na rezervaci.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
   <td data-col="price" class="num price">${czk(offer.pricePerPerson)}</td>
   <td data-col="perPerson" class="num muted">${czk(offer.priceTotal)}</td>
   <td data-col="airline">${offer.airlineName ?? '—'}</td>
