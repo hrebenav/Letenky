@@ -39,6 +39,22 @@ export function createMockProvider({ marker = '', seed = new Date().toISOString(
         price = Math.round((base * 0.6) / 10) * 10;
       }
       const transfers = hash(`t${key}`) < 0.25 ? 0 : hash(`t${key}`) < 0.8 ? 1 : 2;
+      const durationTo = 780 + Math.round(hash(`d${key}`) * 900);
+      const durationBack = 780 + Math.round(hash(`e${key}`) * 900);
+      // Skutečná doba cesty = let + čekání na přestupech. Mock to musí umět taky,
+      // jinak by se nedal ověřit rozpad z odkazu (parseItinerary).
+      const waitTo = transfers * (90 + Math.round(hash(`w${key}`) * 600));
+      const waitBack = transfers * (90 + Math.round(hash(`v${key}`) * 600));
+      const elapsedTo = durationTo + waitTo;
+      const elapsedBack = durationBack + waitBack;
+      // Odkaz ve stejném tvaru, jaký posílá API: dvojice timestampů + kódy letišť.
+      const depTs = Math.floor(new Date(`${departureDate}T06:25:00Z`).getTime() / 1000);
+      const retTs = Math.floor(new Date(`${returnDate}T06:10:00Z`).getTime() / 1000);
+      const chain = (a, b, n) => [a, ...Array.from({ length: n }, (_, i) => ['BUD', 'IST', 'DXB'][i % 3]), b].join('');
+      const leg = (dep, minutes, ports) =>
+        `${dep}${dep + minutes * 60}${String(100 + Math.floor(hash(`f${key}`) * 899)).padStart(6, '0')}${ports}`;
+      const token = `XX${leg(depTs, elapsedTo, chain(origin, destination, transfers))}${leg(retTs, elapsedBack, chain(destination, origin, transfers))}_mock_1`;
+
       return [
         {
           origin,
@@ -52,8 +68,10 @@ export function createMockProvider({ marker = '', seed = new Date().toISOString(
           return_at: `${returnDate}T${String(6 + Math.floor(hash(`r${key}`) * 15)).padStart(2, '0')}:10:00+07:00`,
           transfers,
           return_transfers: transfers,
-          duration_to: 780 + Math.round(hash(`d${key}`) * 900),
-          duration_back: 780 + Math.round(hash(`e${key}`) * 900),
+          duration_to: durationTo,
+          duration_back: durationBack,
+          duration: elapsedTo + elapsedBack,
+          link: `/search/${origin}${destination}?t=${token}`,
         },
       ];
     },

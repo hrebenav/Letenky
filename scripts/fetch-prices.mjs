@@ -14,7 +14,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createProvider } from './lib/travelpayouts.mjs';
+import { createProvider, parseItinerary } from './lib/travelpayouts.mjs';
 import { createMockProvider } from './lib/mock.mjs';
 import { airlineName } from './lib/airlines.mjs';
 import { annotateDeals, buildBaselines, buildTrend, loadHistory, routeKey } from './lib/history.mjs';
@@ -63,6 +63,7 @@ function normalizeOffer(raw, task, config, provider) {
   const pricePerPerson = Number(raw.price);
   if (!Number.isFinite(pricePerPerson) || pricePerPerson <= 0) return null;
   const passengers = config.passengers;
+  const itinerary = parseItinerary(raw.link, raw.duration);
   return {
     id: `${task.origin.code}-${task.destination.code}-${task.departureDate}-${task.returnDate}`,
     origin: task.origin.code,
@@ -79,8 +80,16 @@ function normalizeOffer(raw, task, config, provider) {
     flightNumber: raw.flight_number ?? null,
     transfers: Number.isFinite(raw.transfers) ? raw.transfers : null,
     returnTransfers: Number.isFinite(raw.return_transfers) ? raw.return_transfers : null,
+    // duration_to / duration_back je čistý čas ve vzduchu. Skutečnou dobu cesty
+    // včetně čekání na přestupech nese až `duration` (součet obou směrů) a
+    // timestampy v odkazu, odkud ji parseItinerary rozpadne po směrech.
     durationTo: Number.isFinite(raw.duration_to) ? raw.duration_to : null,
     durationBack: Number.isFinite(raw.duration_back) ? raw.duration_back : null,
+    elapsedTotal: Number.isFinite(raw.duration) ? raw.duration : null,
+    elapsedTo: itinerary?.elapsedTo ?? null,
+    elapsedBack: itinerary?.elapsedBack ?? null,
+    stopsTo: itinerary?.stopsTo ?? null,
+    stopsBack: itinerary?.stopsBack ?? null,
     link: provider.bookingLink({
       origin: task.origin.code,
       destination: task.destination.code,

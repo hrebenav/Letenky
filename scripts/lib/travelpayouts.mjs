@@ -160,3 +160,42 @@ export function createProvider({
     bookingLink: (args) => bookingLink({ ...args, marker }),
   };
 }
+
+/**
+ * Vytáhne z odkazu na rezervaci skutečnou dobu cesty pro každý směr.
+ *
+ * API posílá `duration_to` / `duration_back` jako čistý čas ve vzduchu a čas
+ * příletu neposílá vůbec, takže se z polí samotných doba cesty spočítat nedá.
+ * Parametr `t` v odkazu ale nese unixové timestampy odletu a příletu:
+ *
+ *   MU 1798443900 1798728300 004380 PRGBUDNGBKMGHAN 1799555400 ... HANPEKISTPRG
+ *      └ odlet    └ přílet    └ let  └ přestupní body
+ *
+ * Formát je nezdokumentovaný, a tak se výsledek ověřuje proti poli `duration`
+ * (součet obou směrů v minutách). Když součet nesedí, parsování se zahodí –
+ * radši nic než vymyšlené číslo.
+ */
+export function parseItinerary(rawLink, durationTotal) {
+  if (!rawLink || !Number.isFinite(durationTotal)) return null;
+
+  const token = String(rawLink).match(/[?&]t=([^&]+)/)?.[1];
+  if (!token) return null;
+
+  const legs = [...token.matchAll(/(\d{10})(\d{10})\d{4,8}?([A-Z]{6,})/g)].map(([, dep, arr, ports]) => ({
+    minutes: (Number(arr) - Number(dep)) / 60,
+    stops: ports.match(/.{3}/g) ?? [],
+  }));
+
+  if (legs.length !== 2) return null;
+  if (legs.some((l) => !Number.isFinite(l.minutes) || l.minutes <= 0)) return null;
+
+  const sum = legs[0].minutes + legs[1].minutes;
+  if (sum !== durationTotal) return null;   // kontrolní součet nesedí → nevěřit
+
+  return {
+    elapsedTo: legs[0].minutes,
+    elapsedBack: legs[1].minutes,
+    stopsTo: legs[0].stops,
+    stopsBack: legs[1].stops,
+  };
+}

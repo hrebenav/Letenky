@@ -624,9 +624,13 @@ function renderTable(offers) {
       // U nabídky PRG→HAN se 3 přestupy hlásí API 17 h 10 min, zatímco reálná
       // cesta trvá 35 h 50 min – zbytek je čekání na přestupech. Popisek to
       // proto musí říct nahlas, jinak si to každý přečte jako celkovou dobu.
+      // Hlavní je skutečná doba cesty (let + čekání na přestupech). Čistý letový
+      // čas je až záloha pro nabídky, u kterých se rozpad z odkazu nepovedl.
+      const travelTime = duration(offer.elapsedTo);
       const flightTime = duration(offer.durationTo);
       const depTime = clockTime(offer.departureAt);
       const retTime = clockTime(offer.returnAt);
+      const via = offer.stopsTo?.length > 2 ? offer.stopsTo.slice(1, -1).join(' · ') : null;
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
       if (offer.dealPct === null || offer.dealPct === undefined) {
@@ -642,7 +646,11 @@ function renderTable(offers) {
 
       return `<tr>
   <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
-  <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se do něj nepočítá a API čas příletu neposílá, takže skutečná doba cesty tu být nemůže – u víc přestupů bývá i dvojnásobná. Reálný čas uvidíš po prokliku na rezervaci.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
+  <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${travelTime
+    ? `<small class="muted" title="Celková doba cesty tam: od odletu po přistání v cíli, včetně čekání na přestupech.${flightTime ? ` Z toho ve vzduchu ${flightTime}.` : ''}${via ? ` Přes ${via}.` : ''}">na cestě ${travelTime}${via ? ` · přes ${via}` : ''}</small>`
+    : flightTime
+      ? `<small class="muted" title="Čistý čas ve vzduchu. Celkovou dobu cesty se u téhle nabídky nepodařilo zjistit, takže čekání na přestupech v čísle není.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>`
+      : ''}</td>
   <td data-col="price" class="num price">${czk(offer.pricePerPerson)}</td>
   <td data-col="perPerson" class="num muted">${czk(offer.priceTotal)}</td>
   <td data-col="airline">${offer.airlineName ?? '—'}</td>
