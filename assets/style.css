@@ -264,3 +264,199 @@ tbody tr:hover { background: var(--surface-2); }
 @media (prefers-reduced-motion: no-preference) {
   .chart__canvas svg { transition: opacity 120ms ease; }
 }
+
+/* ==========================================================================
+   Vizuální vrstva: hero pruh, karty destinací, kultivovanější tiles a tabulka.
+   Nic z toho nemění data ani chování – jen vzhled.
+   ========================================================================== */
+
+/* ---------- hero ---------- */
+
+.page-header {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, var(--series-1-soft), var(--surface-1) 62%);
+  border-bottom: 1px solid var(--border);
+  padding-block: 22px 24px;
+}
+
+.page-header__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  color: var(--series-1);
+  opacity: 0.5;
+}
+
+.hero-hill { fill: currentColor; opacity: 0.16; }
+.hero-hill--far { opacity: 0.1; }
+.hero-sun { fill: currentColor; opacity: 0.18; }
+.hero-plane { fill: currentColor; opacity: 0.4; }
+.hero-trail path { stroke: currentColor; fill: none; stroke-width: 2; opacity: 0.3; stroke-linecap: round; }
+
+.page-header h1 {
+  font-size: clamp(21px, 2.4vw, 28px);
+  letter-spacing: -0.02em;
+}
+
+/* ---------- tiles s akcentem ---------- */
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--series-1);
+  opacity: 0.85;
+}
+
+.tile:first-child::before { background: var(--good); }
+.tile:first-child .tile__value { color: var(--good); }
+
+.tile:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgb(0 0 0 / 0.07); }
+
+/* ---------- karty destinací ---------- */
+
+.card--dest { padding-bottom: 20px; }
+
+.dest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 14px;
+}
+
+/* Akcent se přepíná podle motivu; JS dodá obě hodnoty inline, aby barva
+   v tmavém režimu nebyla jen ztmavená světlá. */
+.dest-card { --accent: var(--accent-light); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dest-card { --accent: var(--accent-dark); }
+}
+:root[data-theme="dark"] .dest-card { --accent: var(--accent-dark); }
+
+.dest-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 12px;
+  background: var(--surface-1);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.dest-card:hover,
+.dest-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.1);
+  outline: none;
+}
+
+.dest-card:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+.dest-card.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.dest-card.is-active::after {
+  content: '✓ filtrováno';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.dest-card__media {
+  color: var(--accent);
+  line-height: 0;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-1));
+}
+
+.dest-card__art { display: block; width: 100%; height: auto; }
+
+.dest-card__body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 2px; }
+
+.dest-card__title {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.dest-card__country {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dest-card__price {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.dest-card__meta { margin: 0; font-size: 12.5px; color: var(--text-secondary); }
+
+.dest-card__flags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; min-height: 0; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pill--deal { background: var(--good-soft); color: var(--good); }
+.pill--target { background: color-mix(in srgb, var(--series-1) 14%, transparent); color: var(--series-1); }
+.pill--best { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+
+/* ---------- jemné doladění zbytku ---------- */
+
+.card { border-radius: 12px; }
+
+.chips .chip { transition: background 0.12s ease, border-color 0.12s ease; }
+
+.offers tbody tr { transition: background 0.1s ease; }
+
+@media (max-width: 560px) {
+  .dest-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .dest-card__price { font-size: 17px; }
+  .page-header__art { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .dest-card { transition: none; }
+  .tile:hover, .dest-card:hover { transform: none; }
+}
+
+/* Karty destinací si vzaly vlastní sekci, takže v gridu zbyl jen graf –
+   ať se roztáhne na plnou šířku místo prázdného sloupce vedle sebe. */
+.grid { grid-template-columns: minmax(0, 1fr); }

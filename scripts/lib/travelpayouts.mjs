@@ -35,6 +35,7 @@ export function createProvider({
   market = 'cz',
   timeoutMs = 20000,
   retries = 3,
+  requestsPerSecond = 4,
   logger = console,
 }) {
   if (!token) {
@@ -45,6 +46,20 @@ export function createProvider({
   }
 
   let requestCount = 0;
+
+  // Travelpayouts povoluje 300 requestů za minutu. Paralelní fronta bez
+  // brzdy jich posílá přes 30 za sekundu, API to utne a padá hlavně měsíční
+  // fallback, který běží jako poslední – tedy přesně to, co má data doplnit.
+  // Tahle branka rozprostře všechna volání napříč souběžnými workery.
+  const minIntervalMs = Math.ceil(1000 / requestsPerSecond);
+  let nextSlotAt = 0;
+
+  async function awaitSlot() {
+    const now = Date.now();
+    const slot = Math.max(now, nextSlotAt);
+    nextSlotAt = slot + minIntervalMs;
+    if (slot > now) await sleep(slot - now);
+  }
 
   async function call(params) {
     const url = new URL(BASE);
@@ -60,13 +75,22 @@ export function createProvider({
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
+        await awaitSlot();
         requestCount += 1;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: { Accept: 'application/json', 'User-Agent': 'letenky-microsite/1.0' },
         });
         if (res.status === 429 || res.status >= 500) {
-          throw new Error(`HTTP ${res.status}`);
+          const err = new Error(`HTTP ${res.status}`);
+          if (res.status === 429) {
+            err.rateLimited = true;
+            // Server může říct, za jak dlouho to zkusit znovu. Když mlčí, počkáme déle
+            // než u běžné chyby – krátký backoff proti rate limitu nic nevyřeší.
+            const retryAfter = Number(res.headers.get('retry-after'));
+            err.retryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null;
+          }
+          throw err;
         }
         if (!res.ok) {
           // 4xx mimo 429 nemá smysl opakovat (špatný token, neplatný IATA kód…)
@@ -83,7 +107,9 @@ export function createProvider({
       } catch (error) {
         lastError = error;
         if (error.noRetry || attempt === retries) break;
-        const backoff = 500 * 2 ** (attempt - 1) + Math.random() * 250;
+        const backoff = error.rateLimited
+          ? (error.retryAfterMs ?? 5000 * attempt) + Math.random() * 500
+          : 500 * 2 ** (attempt - 1) + Math.random() * 250;
         logger.warn(`  ⟳ pokus ${attempt}/${retries} selhal (${error.message}), čekám ${Math.round(backoff)} ms`);
         await sleep(backoff);
       } finally {
