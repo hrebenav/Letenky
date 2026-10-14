@@ -26,8 +26,12 @@ const state = {
 
 const czkFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 });
 const czk = (value) => `${czkFormat.format(Math.round(value))} Kč`;
+// Zkratka na tisíce počítá s jedním desetinným místem, takže ji nesmí tisknout
+// czkFormat (0 desetinných). Jinak se při úzkém rozpětí cen slijí všechny
+// značky osy do jedné hodnoty – "38 tis., 38 tis., 37 tis., 37 tis.".
+const thousandsFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
 const czkShort = (value) =>
-  value >= 10000 ? `${czkFormat.format(Math.round(value / 100) / 10)} tis.` : czkFormat.format(value);
+  value >= 10000 ? `${thousandsFormat.format(Math.round(value / 100) / 10)} tis.` : czkFormat.format(value);
 
 function dayMonth(isoDate) {
   const [y, m, d] = isoDate.split('-');
@@ -359,7 +363,13 @@ function renderChart() {
   const x = (i) => margin.left + (points.length === 1 ? plotWidth / 2 : (i / (points.length - 1)) * plotWidth);
   const y = (v) => margin.top + plotHeight - ((v - yMin) / (yMax - yMin)) * plotHeight;
 
-  const ticks = niceTicks(yMin, yMax, 4);
+  const seenTickLabels = new Set();
+  const ticks = niceTicks(yMin, yMax, 4).filter((t) => {
+    const label = czkShort(t);
+    if (seenTickLabels.has(label)) return false;
+    seenTickLabels.add(label);
+    return true;
+  });
   const minPoint = points.reduce((a, b) => (b.value < a.value ? b : a));
   const minIndex = points.indexOf(minPoint);
   const lastIndex = points.length - 1;
@@ -393,8 +403,15 @@ function renderChart() {
     `<circle class="series-dot" cx="${x(lastIndex).toFixed(1)}" cy="${y(lastValue).toFixed(1)}" r="4.5"></circle>`,
     `<text class="endpoint-label" x="${(x(lastIndex) + 9).toFixed(1)}" y="${(y(lastValue) + 4).toFixed(1)}">${czk(lastValue)}</text>`,
   ];
-  if (minIndex !== lastIndex) {
-    const anchor = x(minIndex) > margin.left + plotWidth * 0.75 ? 'end' : 'middle';
+  // U ploché křivky (všechny dny stejná cena) je značka minima jen šum –
+  // hodnotu už nese popisek na konci. Navíc by se její text tiskl přes osu.
+  if (minIndex !== lastIndex && rawMax > rawMin) {
+    // U krajních bodů se text zarovná dovnitř grafu, ať nepřeteče přes osu.
+    const anchor = x(minIndex) > margin.left + plotWidth * 0.75
+      ? 'end'
+      : x(minIndex) < margin.left + plotWidth * 0.1
+        ? 'start'
+        : 'middle';
     labels.push(
       `<circle class="series-dot series-dot--deal" cx="${x(minIndex).toFixed(1)}" cy="${y(minPoint.value).toFixed(1)}" r="4.5"></circle>`,
       `<text class="axis-label axis-label--num" x="${x(minIndex).toFixed(1)}" y="${(y(minPoint.value) + 18).toFixed(1)}" text-anchor="${anchor}">min ${czkShort(minPoint.value)}</text>`,
