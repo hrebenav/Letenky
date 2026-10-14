@@ -26,7 +26,9 @@ const HISTORY_DIR = path.join(DATA_DIR, 'history');
 const args = new Set(process.argv.slice(2));
 const MOCK = args.has('--mock');
 const SAMPLE = args.has('--sample');
-const DRY_RUN = args.has('--dry-run');
+// SAMPLE běží jen nad zlomkem tras, takže jeho výsledek NIKDY nesmí přepsat
+// ostrý dataset – jinak zůstane latest.json s hrstkou nabídek nebo úplně prázdný.
+const DRY_RUN = args.has('--dry-run') || args.has('--sample');
 const VERBOSE = args.has('--verbose');
 
 const today = new Date().toISOString().slice(0, 10);
@@ -89,14 +91,37 @@ function normalizeOffer(raw, task, config, provider) {
   };
 }
 
+/** Trasy, které v posledním ostrém běhu vrátily nabídku. Prázdné pole, když historii nemáme. */
+async function provenRoutes() {
+  try {
+    const latest = JSON.parse(await readFile(path.join(DATA_DIR, 'latest.json'), 'utf8'));
+    if (latest.mode !== 'live') return [];
+    const seen = new Map();
+    for (const o of latest.offers ?? []) seen.set(`${o.origin}-${o.destination}`, { origin: o.origin, destination: o.destination });
+    return [...seen.values()].slice(0, 2);
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   const config = JSON.parse(await readFile(path.join(ROOT, 'config', 'search.json'), 'utf8'));
 
   let origins = config.origins;
   let destinations = config.destinations;
   if (SAMPLE) {
-    origins = origins.slice(0, 1);
-    destinations = destinations.slice(0, 2);
+    // Prvních pár tras z configu bývá na cache chudých, takže vzorek často
+    // skončil s nulou nabídek a neověřil vůbec nic. Když máme poslední běh,
+    // vybereme radši trasu, která posledně data vrátila.
+    const proven = await provenRoutes();
+    if (proven.length) {
+      const codes = { origins: new Set(proven.map((r) => r.origin)), destinations: new Set(proven.map((r) => r.destination)) };
+      origins = origins.filter((o) => codes.origins.has(o.code));
+      destinations = destinations.filter((d) => codes.destinations.has(d.code));
+    } else {
+      origins = origins.slice(0, 1);
+      destinations = destinations.slice(0, 2);
+    }
     log('⚑ SAMPLE režim: jen', origins.map((o) => o.code).join(','), '→', destinations.map((d) => d.code).join(','));
   }
 
@@ -142,6 +167,7 @@ async function main() {
   });
 
   let dumpedRaw = false;
+  let rawSample = null;
   for (const result of results) {
     if (!result.ok) {
       const { origin, destination, departureDate, returnDate } = result.item;
@@ -167,6 +193,7 @@ async function main() {
     if (VERBOSE && !dumpedRaw) {
       dumpedRaw = true;
       console.log('   RAW odpověď API (všechna pole):', JSON.stringify(cheapest, null, 2));
+      rawSample = { route: `${task.origin.code}-${task.destination.code}`, raw: cheapest };
     }
     const offer = normalizeOffer(cheapest, task, config, provider);
     if (offer) offersByCombo.set(offer.id, offer);
@@ -302,6 +329,14 @@ async function main() {
       `Nenalezena ani jedna nabídka a ${errors.length} kombinací skončilo chybou – data zůstávají beze změny. ` +
         `První chyba: ${errors[0].message}`,
     );
+  }
+
+  // Syrová odpověď do souboru, ne jen do logu – logy Actions se servírují
+  // z jiného serveru a přes API je nepřečteme.
+  if (VERBOSE && rawSample) {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(path.join(DATA_DIR, '_debug-raw.json'), JSON.stringify(rawSample, null, 2));
+    log('⚑ syrová odpověď uložena do data/_debug-raw.json');
   }
 
   if (DRY_RUN) {
