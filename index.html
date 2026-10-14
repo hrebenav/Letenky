@@ -39,7 +39,7 @@
     <article class="tile tile--hero">
       <h2 class="tile__label">Nejlevnější dnes</h2>
       <p class="tile__value" id="kpi-today-value">—</p>
-      <p class="tile__note" id="kpi-today-note">za 2 osoby zpáteční</p>
+      <p class="tile__note" id="kpi-today-note">za osobu, zpáteční</p>
     </article>
     <article class="tile">
       <h2 class="tile__label">Nejlevnější za sledované období</h2>
@@ -102,7 +102,7 @@
     <section class="card card--chart" aria-labelledby="chart-title">
       <div class="card__head">
         <h2 id="chart-title">Vývoj nejnižší ceny</h2>
-        <p class="card__sub" id="chart-sub">za 2 osoby, podle vybraných tras</p>
+        <p class="card__sub" id="chart-sub">za osobu, podle vybraných tras</p>
       </div>
       <figure class="chart" id="chart">
         <div class="chart__canvas" id="chart-canvas"></div>
@@ -125,7 +125,7 @@
   <section class="card card--dest" aria-labelledby="dest-title">
     <div class="card__head">
       <h2 id="dest-title">Kam se dnes vyplatí letět</h2>
-      <p class="card__sub">nejnižší dnešní cena za 2 osoby · klikni na destinaci a profiltruje se tabulka</p>
+      <p class="card__sub">nejnižší dnešní cena za osobu · klikni na destinaci a profiltruje se tabulka</p>
     </div>
     <div class="dest-grid" id="dest-cards"></div>
   </section>
@@ -144,8 +144,8 @@
           <tr>
             <th scope="col">Trasa</th>
             <th scope="col">Termín</th>
-            <th scope="col" class="num">Cena za 2 os.</th>
-            <th scope="col" class="num">Za osobu</th>
+            <th scope="col" class="num">Cena za osobu</th>
+            <th scope="col" class="num">Za 2 os.</th>
             <th scope="col">Aerolinka</th>
             <th scope="col" class="num">Přestupy</th>
             <th scope="col" class="num">vs. průměr</th>
@@ -171,7 +171,7 @@
 
 <footer class="page-footer">
   <p id="footer-source">—</p>
-  <p>Ceny pocházejí z cache vyhledávání Aviasales a nemusí být v danou chvíli dostupné. Před nákupem si cenu vždy ověř kliknutím na odkaz. Cena za 2 osoby je dopočítaná jako dvojnásobek ceny za osobu a nezahrnuje zavazadla ani poplatky za platbu.</p>
+  <p>Ceny pocházejí z cache vyhledávání Aviasales a nemusí být v danou chvíli dostupné. Před nákupem si cenu vždy ověř kliknutím na odkaz. Všechny ceny jsou za jednu osobu a zpáteční cestu. Sloupec „za 2 os." je prostý dvojnásobek a nezahrnuje zavazadla ani poplatky za platbu.</p>
 </footer>
 
 <div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>

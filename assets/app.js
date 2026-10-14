@@ -265,9 +265,9 @@ function render() {
 function renderTiles(offers) {
   const cheapest = offers[0] && offers.reduce((a, b) => (b.priceTotal < a.priceTotal ? b : a));
   if (cheapest) {
-    el('kpi-today-value').textContent = czk(cheapest.priceTotal);
+    el('kpi-today-value').textContent = czk(cheapest.pricePerPerson);
     el('kpi-today-note').textContent =
-      `${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} · ${dayMonth(cheapest.departureDate)}–${dayMonth(cheapest.returnDate)} · ${czk(cheapest.pricePerPerson)} za osobu`;
+      `${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} · ${dayMonth(cheapest.departureDate)}–${dayMonth(cheapest.returnDate)} · ${czk(cheapest.priceTotal)} za ${passengers()} ${passengers() < 5 ? 'osoby' : 'osob'}`;
   } else {
     el('kpi-today-value').textContent = '—';
     el('kpi-today-note').textContent = 'pro zvolené filtry nic nenalezeno';
@@ -299,6 +299,11 @@ function renderTiles(offers) {
 }
 
 /** Časová řada nejnižší ceny pro aktuálně vybrané trasy. */
+/** Počet cestujících, pro který fetch skript počítal priceTotal. */
+function passengers() {
+  return state.latest?.passengers || 1;
+}
+
 function trendSeries() {
   const routes = new Set(selectedRoutes());
   return (state.summary.trend ?? []).map((day) => {
@@ -309,7 +314,9 @@ function trendSeries() {
       count += 1;
       if (min === null || price < min) min = price;
     }
-    return { date: day.date, value: min, count };
+    // summary.json drží ceny za celou skupinu; dashboard mluví za osobu,
+    // tak se dělí jednou tady a všechno dál už je ve stejné jednotce.
+    return { date: day.date, value: min === null ? null : min / passengers(), count };
   });
 }
 
@@ -334,7 +341,7 @@ function renderChart() {
   const totalRoutes = state.latest.config.origins.length * state.latest.config.destinations.length;
 
   el('chart-sub').textContent =
-    `nejnižší cena za ${state.latest.passengers} osoby, ${routeCount === totalRoutes ? 'všechny trasy' : `vybrané trasy (${routeCount})`}`;
+    `nejnižší cena za osobu, ${routeCount === totalRoutes ? 'všechny trasy' : `vybrané trasy (${routeCount})`}`;
 
   if (points.length < 2) {
     canvas.innerHTML =
@@ -569,12 +576,12 @@ function card(offer, cheapest) {
   return `<article class="dest-card${active ? ' is-active' : ''}" data-code="${offer.destination}"
     style="--accent-light:${accent.light};--accent-dark:${accent.dark}"
     tabindex="0" role="button" aria-pressed="${active}"
-    aria-label="${cityName(offer.destination)} od ${czk(offer.priceTotal)} za 2 osoby, filtrovat">
+    aria-label="${cityName(offer.destination)} od ${czk(offer.pricePerPerson)} za osobu, filtrovat">
   <div class="dest-card__media">${destinationArt(offer.destination)}</div>
   <div class="dest-card__body">
     <h3 class="dest-card__title">${cityName(offer.destination)}</h3>
     <p class="dest-card__country">${countryOf(offer.destination)}</p>
-    <p class="dest-card__price">${czk(offer.priceTotal)}</p>
+    <p class="dest-card__price">${czk(offer.pricePerPerson)}</p>
     <p class="dest-card__meta">z ${cityName(offer.origin)} · ${transfers}</p>
     <div class="dest-card__flags">${flags.join('')}</div>
   </div>
@@ -627,8 +634,8 @@ function renderTable(offers) {
       return `<tr>
   <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
   <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se nepočítá – u víc přestupů bývá reálná cesta i dvakrát delší.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
-  <td data-col="price" class="num price">${czk(offer.priceTotal)}</td>
-  <td data-col="perPerson" class="num muted">${czk(offer.pricePerPerson)}</td>
+  <td data-col="price" class="num price">${czk(offer.pricePerPerson)}</td>
+  <td data-col="perPerson" class="num muted">${czk(offer.priceTotal)}</td>
   <td data-col="airline">${offer.airlineName ?? '—'}</td>
   <td data-col="transfers" class="num">${transfers}</td>
   <td data-col="deal" class="num">${deal}</td>

@@ -141,6 +141,7 @@ async function main() {
     return { task, raw };
   });
 
+  let dumpedRaw = false;
   for (const result of results) {
     if (!result.ok) {
       const { origin, destination, departureDate, returnDate } = result.item;
@@ -160,6 +161,13 @@ async function main() {
     }
     // API řadíme podle ceny, ale pro jistotu vybíráme minimum sami.
     const cheapest = raw.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
+    // Ve verbose režimu vypíšeme jednu syrovou odpověď se všemi poli. Slouží
+    // ke kontrole, co API skutečně posílá – např. jestli existuje čas příletu,
+    // ze kterého by šla spočítat celková doba cesty včetně přestupů.
+    if (VERBOSE && !dumpedRaw) {
+      dumpedRaw = true;
+      console.log('   RAW odpověď API (všechna pole):', JSON.stringify(cheapest, null, 2));
+    }
     const offer = normalizeOffer(cheapest, task, config, provider);
     if (offer) offersByCombo.set(offer.id, offer);
   }
