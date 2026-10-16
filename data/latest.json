@@ -1,6 +1,6 @@
 {
- "generatedAt": "2026-10-15T09:08:34.199Z",
- "date": "2026-10-15",
+ "generatedAt": "2026-10-16T09:01:21.309Z",
+ "date": "2026-10-16",
  "mode": "live",
  "currency": "CZK",
  "passengers": 2,
@@ -13,8 +13,8 @@
   "empty": 589,
   "errors": 0,
   "requests": 636,
-  "elapsedSeconds": 158.9,
-  "historyDays": 2
+  "elapsedSeconds": 196.4,
+  "historyDays": 3
  },
  "config": {
   "origins": [
@@ -96,25 +96,25 @@
  },
  "baselines": {
   "PRG-HAN": {
-   "days": 2,
+   "days": 3,
    "avg": 37466,
    "min": 37466,
    "minDate": "2026-10-13"
   },
   "VIE-SGN": {
-   "days": 2,
+   "days": 3,
    "avg": 42520,
    "min": 42520,
    "minDate": "2026-10-13"
   },
   "VIE-HAN": {
-   "days": 2,
-   "avg": 45152,
+   "days": 3,
+   "avg": 45143,
    "min": 45124,
    "minDate": "2026-10-14"
   },
   "MUC-KUL": {
-   "days": 2,
+   "days": 3,
    "avg": 49342,
    "min": 49342,
    "minDate": "2026-10-13"
@@ -145,8 +145,8 @@
    "durationTo": 1030,
    "durationBack": 1020,
    "link": "https://www.aviasales.com/search/PRG2812HAN10012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": 0,
+   "vsMinPct": 0,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -169,8 +169,8 @@
    "durationTo": 950,
    "durationBack": 1045,
    "link": "https://www.aviasales.com/search/VIE2812SGN10012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": 0,
+   "vsMinPct": 0,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -193,8 +193,8 @@
    "durationTo": 825,
    "durationBack": 920,
    "link": "https://www.aviasales.com/search/VIE2812HAN09012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": 0,
+   "vsMinPct": 0,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -217,8 +217,8 @@
    "durationTo": 1015,
    "durationBack": 1055,
    "link": "https://www.aviasales.com/search/VIE2812SGN11012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -8.2,
+   "vsMinPct": -8.2,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -241,8 +241,8 @@
    "durationTo": 1035,
    "durationBack": 1050,
    "link": "https://www.aviasales.com/search/VIE2712SGN10012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -12.6,
+   "vsMinPct": -12.6,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -265,8 +265,8 @@
    "durationTo": 950,
    "durationBack": 970,
    "link": "https://www.aviasales.com/search/VIE2612SGN11012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -13.2,
+   "vsMinPct": -13.2,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -289,8 +289,8 @@
    "durationTo": 785,
    "durationBack": 905,
    "link": "https://www.aviasales.com/search/MUC2812KUL08012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": 0,
+   "vsMinPct": 0,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -313,8 +313,8 @@
    "durationTo": 795,
    "durationBack": 975,
    "link": "https://www.aviasales.com/search/MUC2812KUL07012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -0.7,
+   "vsMinPct": -0.7,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -337,8 +337,8 @@
    "durationTo": 945,
    "durationBack": 955,
    "link": "https://www.aviasales.com/search/MUC2712KUL07012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -3.5,
+   "vsMinPct": -3.5,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -361,8 +361,8 @@
    "durationTo": 850,
    "durationBack": 905,
    "link": "https://www.aviasales.com/search/MUC2712KUL08012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -6.7,
+   "vsMinPct": -6.7,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
@@ -385,8 +385,8 @@
    "durationTo": 880,
    "durationBack": 905,
    "link": "https://www.aviasales.com/search/MUC2612KUL08012",
-   "dealPct": null,
-   "vsMinPct": null,
+   "dealPct": -9.7,
+   "vsMinPct": -9.7,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
