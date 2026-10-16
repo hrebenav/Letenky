@@ -18,7 +18,7 @@ import { createProvider, parseItinerary } from './lib/travelpayouts.mjs';
 import { createSerpProvider, normalizeSerpOffer, planQueries } from './lib/serpapi.mjs';
 import { createMockProvider } from './lib/mock.mjs';
 import { airlineName } from './lib/airlines.mjs';
-import { annotateDeals, buildBaselines, buildTrend, loadHistory, routeKey } from './lib/history.mjs';
+import { annotateDeals, buildBaselines, buildTrend, loadHistory, pickVariants, routeKey } from './lib/history.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -66,6 +66,16 @@ async function runPool(items, concurrency, worker) {
  * by přicházel v úvahu, a jako nejlevnější nález by táhl dolů minimum, průměr
  * i vyhodnocení cenových bomb. Kontroluje se i zpáteční směr.
  */
+/** Fronta nabídek pro jednu kombinaci trasa+termín, bez duplicit. */
+function addCandidate(candidates, offer) {
+  const list = candidates.get(offer.id) ?? [];
+  const duplicate = list.some(
+    (o) => o.priceTotal === offer.priceTotal && o.transfers === offer.transfers && o.airline === offer.airline,
+  );
+  if (!duplicate) list.push(offer);
+  candidates.set(offer.id, list);
+}
+
 function withinTransferLimit(raw, maxTransfers) {
   if (!Number.isFinite(maxTransfers)) return true;
   const there = Number(raw.transfers);
@@ -183,7 +193,8 @@ async function main() {
 
   const started = Date.now();
   const errors = [];
-  const offersByCombo = new Map();
+  // Klíč je kombinace trasa+termín, hodnota pole kandidátů na ni.
+  const candidates = new Map();
   let emptyCount = 0;
 
   const results = await runPool(tasks, config.fetch.concurrency, async (task) => {
@@ -232,8 +243,12 @@ async function main() {
       console.log('   RAW odpověď API (všechna pole):', JSON.stringify(cheapest, null, 2));
       rawSample = { route: `${task.origin.code}-${task.destination.code}`, raw: cheapest };
     }
-    const offer = normalizeOffer(cheapest, task, config, provider);
-    if (offer) offersByCombo.set(offer.id, offer);
+    // Všechny přijatelné nabídky jdou do fronty; která se nakonec zobrazí,
+    // rozhodne pickVariants – nejlevnější nemusí být ta, kterou chce člověk letět.
+    for (const item of allowed) {
+      const offer = normalizeOffer(item, task, config, provider);
+      if (offer) addCandidate(candidates, offer);
+    }
   }
 
   // Záložní měsíční dotaz pro trasy, kde přesné termíny nevrátily vůbec nic.
@@ -246,7 +261,7 @@ async function main() {
     for (const origin of origins) {
       for (const destination of destinations) {
         const key = `${origin.code}-${destination.code}`;
-        const hasAny = [...offersByCombo.values()].some((o) => routeKey(o) === key);
+        const hasAny = [...candidates.values()].some((list) => list.some((o) => routeKey(o) === key));
         if (!hasAny) emptyRoutes.push({ origin, destination });
       }
     }
@@ -279,9 +294,7 @@ async function main() {
           if (!withinTransferLimit(item, config.maxTransfers)) continue;
           const task = { origin, destination, departureDate: dep, returnDate: ret };
           const offer = normalizeOffer(item, task, config, provider);
-          if (!offer) continue;
-          const existing = offersByCombo.get(offer.id);
-          if (!existing || offer.priceTotal < existing.priceTotal) offersByCombo.set(offer.id, offer);
+          if (offer) addCandidate(candidates, offer);
         }
       }
     }
@@ -324,12 +337,8 @@ async function main() {
             maxTransfers: config.maxTransfers,
           });
           if (!offer) continue;
-          // Travelpayouts má přednost – je zdarma a bez kvóty. SerpApi doplňuje.
-          const existing = offersByCombo.get(offer.id);
-          if (!existing || offer.priceTotal < existing.priceTotal) {
-            offersByCombo.set(offer.id, offer);
-            added += 1;
-          }
+          addCandidate(candidates, offer);
+          added += 1;
         }
         debug(`✓ SerpApi ${q.destination} ${q.departureDate}/${q.returnDate}: ${entries.length} itinerářů`);
       } catch (error) {
@@ -352,7 +361,9 @@ async function main() {
     log('⚑ druhý zdroj přeskočen: chybí SERPAPI_KEY');
   }
 
-  const offers = [...offersByCombo.values()].sort((a, b) => a.priceTotal - b.priceTotal);
+  const offers = [...candidates.values()]
+    .flatMap((list) => pickVariants(list, config.variantsPerCombo ?? 3))
+    .sort((a, b) => a.priceTotal - b.priceTotal);
   const elapsed = Math.round((Date.now() - started) / 100) / 10;
 
   log(`✔ hotovo za ${elapsed}s: ${offers.length} nabídek, ${emptyCount} kombinací bez dat, ${errors.length} chyb, ${provider.requestCount} requestů`);

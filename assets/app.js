@@ -53,6 +53,8 @@ function duration(minutes) {
 }
 const cityName = (code) => state.originNames.get(code) ?? state.destinationNames.get(code) ?? code;
 const routeOf = (offer) => `${offer.origin}-${offer.destination}`;
+/** Kombinace trasa+termín bez pořadového čísla varianty (id končí na "#0", "#1"…). */
+const comboOf = (offer) => String(offer.id).split('#')[0];
 
 /* ---------- načtení dat ---------- */
 
@@ -254,11 +256,19 @@ function currentOffers() {
   });
 
   if (filters.bestPerRoute) {
-    const best = new Map();
+    // Nejdřív se pro každou trasu najde nejvýhodnější termín, pak se nechají
+    // VŠECHNY jeho varianty. Kdyby se vybírala jedna nabídka, zmizely by
+    // dražší, ale pohodlnější alternativy – a kvůli těm se sbírají.
+    const bestCombo = new Map();
     for (const offer of offers) {
       const key = routeOf(offer);
-      const current = best.get(key);
-      if (!current || offer.priceTotal < current.priceTotal) best.set(key, offer);
+      const current = bestCombo.get(key);
+      if (!current || offer.priceTotal < current.priceTotal) bestCombo.set(key, offer);
+    }
+    const keepCombos = new Set([...bestCombo.values()].map((o) => comboOf(o)));
+    const best = new Map();
+    for (const offer of offers) {
+      if (keepCombos.has(comboOf(offer))) best.set(offer.id, offer);
     }
     offers = [...best.values()];
   }
@@ -268,6 +278,10 @@ function currentOffers() {
     deal: (a, b) => (b.dealPct ?? -999) - (a.dealPct ?? -999) || a.priceTotal - b.priceTotal,
     departure: (a, b) => a.departureDate.localeCompare(b.departureDate) || a.priceTotal - b.priceTotal,
     route: (a, b) => routeOf(a).localeCompare(routeOf(b)) || a.priceTotal - b.priceTotal,
+    // Nabídky bez známé doby cesty nebo počtu přestupů padají na konec –
+    // jinak by se tvářily jako nejrychlejší jen proto, že údaj chybí.
+    duration: (a, b) => (a.elapsedTo ?? Infinity) - (b.elapsedTo ?? Infinity) || a.priceTotal - b.priceTotal,
+    stops: (a, b) => (a.transfers ?? Infinity) - (b.transfers ?? Infinity) || a.priceTotal - b.priceTotal,
   };
   return offers.sort(sorters[filters.sort] ?? sorters.price);
 }
@@ -623,7 +637,7 @@ function renderTable(offers) {
     offers.length === 0
       ? 'nic nenalezeno'
       : `${shown.length} z ${offers.length} nabídek` +
-        (state.filters.bestPerRoute ? ' · jen nejlevnější termín pro každou trasu' : '') +
+        (state.filters.bestPerRoute ? ' · nejvýhodnější termín pro každou trasu, včetně variant' : '') +
         (underTarget ? ` · ${underTarget} pod cílovou cenou ${czk(state.latest.targetPriceTotal)}` : '');
 
   body.innerHTML = shown
@@ -659,8 +673,16 @@ function renderTable(offers) {
         deal = low || target ? `<span class="badges">${main}${low}${target}</span>` : main;
       }
 
-      return `<tr>
-  <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
+      // Štítek říká, proč je varianta v tabulce, i když není nejlevnější.
+      const VARIANTS = {
+        fewestStops: ['nejmíň přestupů', 'Dráž než nejlevnější varianta na stejné trase a termín, ale s míň přestupy.'],
+        fastest: ['nejrychlejší', 'Dráž než nejlevnější varianta na stejné trase a termín, ale cesta je kratší.'],
+      };
+      const v = VARIANTS[offer.variant];
+      const variantTag = v ? `<span class="variant" title="${v[1]}">${v[0]}</span>` : '';
+
+      return `<tr${offer.variant && offer.variant !== 'cheapest' ? ' class="is-variant"' : ''}>
+  <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}${variantTag}<small>${offer.origin} → ${offer.destination}</small></td>
   <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${travelTime
     ? `<small class="muted" title="Celková doba cesty tam: od odletu z Prahy po přistání v cíli, včetně čekání na přestupech. Posun časových pásem je už započtený, takže 73 h je 73 h na hodinkách.${flightTime ? ` Z toho ve vzduchu ${flightTime}.` : ''}${arrival ? ` Přílet ${arrival} místního času.` : ''}${via ? ` Přes ${via}.` : ''}">na cestě ${travelTime}${arrival ? ` · přílet ${arrival}` : ''}${via ? ` · přes ${via}` : ''}</small>`
     : flightTime

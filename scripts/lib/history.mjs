@@ -121,3 +121,40 @@ export function buildTrend(snapshots, todaySnapshot, trendDays) {
     return { date: snapshot.date, min, byRoute, offerCount: snapshot.offers.length };
   });
 }
+
+/**
+ * Z nabídek na jednu kombinaci (trasa + termín) vybere několik, které se od
+ * sebe smysluplně liší – ne tři odstíny téhož.
+ *
+ * Nejlevnější nabídka bývá zároveň nejnepohodlnější: víc přestupů, delší
+ * čekání, delší cesta. Když se uloží jen ona, není vidět, že o dva tisíce
+ * dráž existuje let o deset hodin kratší. Proto se drží ještě varianta s
+ * nejmenším počtem přestupů a nejrychlejší – ale jen tehdy, když jsou v
+ * daném ohledu skutečně lepší než ta nejlevnější.
+ */
+export function pickVariants(candidates, max = 3) {
+  if (!candidates.length) return [];
+
+  const byPrice = [...candidates].sort((a, b) => a.priceTotal - b.priceTotal);
+  const cheapest = byPrice[0];
+  const picked = [{ ...cheapest, variant: 'cheapest' }];
+
+  const better = (list, key, label) => {
+    const best = list
+      .filter((o) => Number.isFinite(o[key]))
+      .sort((a, b) => a[key] - b[key] || a.priceTotal - b.priceTotal)[0];
+    if (!best) return;
+    if (!Number.isFinite(cheapest[key]) || best[key] >= cheapest[key]) return;  // není lepší
+    if (picked.some((p) => sameItinerary(p, best))) return;
+    picked.push({ ...best, variant: label });
+  };
+
+  better(byPrice, 'transfers', 'fewestStops');
+  better(byPrice, 'elapsedTo', 'fastest');
+
+  return picked.slice(0, max).map((o, i) => ({ ...o, id: `${o.id}#${i}` }));
+}
+
+function sameItinerary(a, b) {
+  return a.priceTotal === b.priceTotal && a.transfers === b.transfers && a.airline === b.airline;
+}

@@ -473,3 +473,17 @@ tbody tr:hover { background: var(--surface-2); }
   color: var(--series-1);
   vertical-align: 1px;
 }
+
+/* Varianta, která není nejlevnější: zaplatíš víc, ale cesta je pohodlnější. */
+.variant {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  vertical-align: 1px;
+}
+tr.is-variant td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
