@@ -60,6 +60,21 @@ async function runPool(items, concurrency, worker) {
   return results;
 }
 
+/**
+ * Nabídky s víc přestupy, než kolik connesl config, se zahazují ještě před
+ * uložením. Důvod není kosmetický: slepenec přes čtyři letiště není let, který
+ * by přicházel v úvahu, a jako nejlevnější nález by táhl dolů minimum, průměr
+ * i vyhodnocení cenových bomb. Kontroluje se i zpáteční směr.
+ */
+function withinTransferLimit(raw, maxTransfers) {
+  if (!Number.isFinite(maxTransfers)) return true;
+  const there = Number(raw.transfers);
+  const back = Number(raw.return_transfers);
+  if (Number.isFinite(there) && there > maxTransfers) return false;
+  if (Number.isFinite(back) && back > maxTransfers) return false;
+  return true;
+}
+
 function normalizeOffer(raw, task, config, provider) {
   const pricePerPerson = Number(raw.price);
   if (!Number.isFinite(pricePerPerson) || pricePerPerson <= 0) return null;
@@ -200,8 +215,15 @@ async function main() {
       emptyCount += 1;
       continue;
     }
+    // Nejdřív vyhodíme nabídky nad limitem přestupů, teprve pak hledáme minimum –
+    // jinak by se jako "nejlevnější" uložil slepenec, který stejně nechceme.
+    const allowed = raw.filter((r) => withinTransferLimit(r, config.maxTransfers));
+    if (!allowed.length) {
+      emptyCount += 1;
+      continue;
+    }
     // API řadíme podle ceny, ale pro jistotu vybíráme minimum sami.
-    const cheapest = raw.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
+    const cheapest = allowed.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
     // Ve verbose režimu vypíšeme jednu syrovou odpověď se všemi poli. Slouží
     // ke kontrole, co API skutečně posílá – např. jestli existuje čas příletu,
     // ze kterého by šla spočítat celková doba cesty včetně přestupů.
@@ -254,6 +276,7 @@ async function main() {
           const dep = String(item.departure_at ?? '').slice(0, 10);
           const ret = String(item.return_at ?? '').slice(0, 10);
           if (!depSet.has(dep) || !retSet.has(ret)) continue;
+          if (!withinTransferLimit(item, config.maxTransfers)) continue;
           const task = { origin, destination, departureDate: dep, returnDate: ret };
           const offer = normalizeOffer(item, task, config, provider);
           if (!offer) continue;
@@ -288,9 +311,18 @@ async function main() {
     log(`▶ druhý zdroj (SerpApi): ${queries.length} dotazů`);
     for (const q of queries) {
       try {
-        const entries = await serp.search({ origins: originCodes, destination: q.destination, ...q });
+        const entries = await serp.search({
+          origins: originCodes,
+          destination: q.destination,
+          ...q,
+          maxTransfers: config.maxTransfers,
+        });
         for (const entry of entries) {
-          const offer = normalizeSerpOffer(entry, { ...q, passengers: config.passengers });
+          const offer = normalizeSerpOffer(entry, {
+            ...q,
+            passengers: config.passengers,
+            maxTransfers: config.maxTransfers,
+          });
           if (!offer) continue;
           // Travelpayouts má přednost – je zdarma a bez kvóty. SerpApi doplňuje.
           const existing = offersByCombo.get(offer.id);
@@ -379,6 +411,7 @@ async function main() {
       destinations,
       departureDates: config.departureDates,
       returnDates: config.returnDates,
+      maxTransfers: config.maxTransfers ?? null,
     },
     baselines: baselines.byRoute,
     offers: annotated,

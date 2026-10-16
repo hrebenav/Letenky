@@ -81,6 +81,7 @@ async function init() {
 
   buildChips();
   bindControls();
+  applyTransferCap();
   renderHeader();
   render();
   el('app').setAttribute('aria-busy', 'false');
@@ -127,6 +128,19 @@ function renderHeader() {
     );
   } else if (latest.stats.errors > 0) {
     showBanner(`Poslední běh skončil s ${latest.stats.errors} chybami u jednotlivých kombinací – ostatní data jsou v pořádku.`);
+  }
+}
+
+/** Přepíše první volbu filtru přestupů podle stropu, který platí v datech. */
+function applyTransferCap() {
+  const cap = state.latest.config.maxTransfers;
+  const select = el('filter-transfers');
+  const any = select.querySelector('option[value=""]');
+  if (!Number.isFinite(cap)) return;
+  if (any) any.textContent = `max ${cap} (vše, co sledujeme)`;
+  for (const option of select.querySelectorAll('option[value]')) {
+    const v = Number(option.value);
+    if (Number.isFinite(v) && v > cap) option.remove();
   }
 }
 

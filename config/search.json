@@ -2,6 +2,8 @@
   "$comment": "Jediné místo, kde se mění parametry hledání. Po úpravě commitni – workflow si to načte při dalším běhu.",
   "currency": "czk",
   "passengers": 2,
+  "maxTransfers": 2,
+  "$maxTransfers": "Nabídky s víc přestupy se vůbec neukládají – nejsou to lety, které by přicházely v úvahu, a zkreslovaly by minimum, průměr i cenové bomby. null = bez omezení.",
   "market": "cz",
   "origins": [
     {

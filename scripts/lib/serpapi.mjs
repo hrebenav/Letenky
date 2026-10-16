@@ -70,7 +70,7 @@ export function createSerpProvider({
      * Jeden dotaz pokryje všechna odletová letiště najednou – departure_id
      * bere víc kódů oddělených čárkou. To je to, co drží rozpočet při zemi.
      */
-    async search({ origins, destination, departureDate, returnDate }) {
+    async search({ origins, destination, departureDate, returnDate, maxTransfers }) {
       const json = await call({
         engine: 'google_flights',
         departure_id: origins.join(','),
@@ -82,6 +82,9 @@ export function createSerpProvider({
         currency,
         hl: language,
         gl: country,
+        // Google umí omezit přestupy už v dotazu: 1 = přímé, 2 = max 1 přestup,
+        // 3 = max 2 přestupy. Nad dva se nefiltruje, protože 0 znamená "jakkoli".
+        ...(Number.isFinite(maxTransfers) && maxTransfers <= 2 ? { stops: maxTransfers + 1 } : {}),
       });
       return [...(json.best_flights ?? []), ...(json.other_flights ?? [])];
     },
@@ -97,9 +100,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * čekání na přestupech a posunů časových pásem, takže se nic dopočítávat
  * nemusí – na rozdíl od Travelpayouts, kde se musí luštit z odkazu.
  */
-export function normalizeSerpOffer(entry, { destination, departureDate, returnDate, passengers }) {
+export function normalizeSerpOffer(entry, { destination, departureDate, returnDate, passengers, maxTransfers }) {
   const legs = entry.flights ?? [];
   if (!legs.length || !Number.isFinite(entry.price)) return null;
+
+  // Pojistka pro případ, že by Google parametr stops ignoroval nebo změnil význam.
+  if (Number.isFinite(maxTransfers) && legs.length - 1 > maxTransfers) return null;
 
   const origin = legs[0].departure_airport?.id;
   if (!origin) return null;
