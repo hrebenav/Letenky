@@ -162,39 +162,56 @@ export function createProvider({
 }
 
 /**
- * Vytáhne z odkazu na rezervaci skutečnou dobu cesty pro každý směr.
+ * Vytáhne z odkazu na rezervaci skutečnou dobu cesty a čas příletu pro každý směr.
  *
  * API posílá `duration_to` / `duration_back` jako čistý čas ve vzduchu a čas
- * příletu neposílá vůbec, takže se z polí samotných doba cesty spočítat nedá.
- * Parametr `t` v odkazu ale nese unixové timestampy odletu a příletu:
+ * příletu neposílá vůbec. Parametr `t` v odkazu ale nese pro každý směr trojici:
  *
- *   MU 1798443900 1798728300 004380 PRGBUDNGBKMGHAN 1799555400 ... HANPEKISTPRG
- *      └ odlet    └ přílet    └ let  └ přestupní body
+ *   MU 1798443900 1798728300 004380 PRGBUDNGBKMGHAN  1799555400 ... 003485 HANPEKISTPRG
+ *      └ odlet    └ přílet   └ min  └ přestupní body
  *
- * Formát je nezdokumentovaný, a tak se výsledek ověřuje proti poli `duration`
- * (součet obou směrů v minutách). Když součet nesedí, parsování se zahodí –
- * radši nic než vymyšlené číslo.
+ * POZOR na ty timestampy: nejsou v UTC, nesou MÍSTNÍ čas daného letiště. Odečítat
+ * je od sebe proto nejde – u Prahy (UTC+1) do Hanoje (UTC+7) by rozdíl vyšel
+ * 79 h místo skutečných 73 h, protože by se přičetl posun pásem. Zpáteční směr
+ * se mýlí o stejných 6 h opačně, takže se chyba v součtu vyruší a kontrola přes
+ * `duration` ji neodhalí.
+ *
+ * Skutečnou dobu cesty proto bereme z toho šestimístného pole, které posuny už
+ * zahrnuje. Timestampy se hodí jen na zobrazení místního času odletu a příletu.
+ *
+ * Formát není zdokumentovaný, takže se výsledek ověřuje dvakrát: součet obou
+ * směrů musí sedět na `duration` a každý směr musí být aspoň tak dlouhý jako
+ * čas ve vzduchu. Když cokoli nesedí, vrací se null – radši nic než výmysl.
  */
-export function parseItinerary(rawLink, durationTotal) {
+export function parseItinerary(rawLink, durationTotal, { durationTo, durationBack } = {}) {
   if (!rawLink || !Number.isFinite(durationTotal)) return null;
 
   const token = String(rawLink).match(/[?&]t=([^&]+)/)?.[1];
   if (!token) return null;
 
-  const legs = [...token.matchAll(/(\d{10})(\d{10})\d{4,8}?([A-Z]{6,})/g)].map(([, dep, arr, ports]) => ({
-    minutes: (Number(arr) - Number(dep)) / 60,
+  const legs = [...token.matchAll(/(\d{10})(\d{10})(\d{4,8}?)([A-Z]{6,})/g)].map(([, dep, arr, mins, ports]) => ({
+    departsLocal: Number(dep),
+    arrivesLocal: Number(arr),
+    minutes: Number(mins),
     stops: ports.match(/.{3}/g) ?? [],
   }));
 
   if (legs.length !== 2) return null;
   if (legs.some((l) => !Number.isFinite(l.minutes) || l.minutes <= 0)) return null;
+  if (legs[0].minutes + legs[1].minutes !== durationTotal) return null;
 
-  const sum = legs[0].minutes + legs[1].minutes;
-  if (sum !== durationTotal) return null;   // kontrolní součet nesedí → nevěřit
+  // Doba cesty nemůže být kratší než samotné létání.
+  if (Number.isFinite(durationTo) && legs[0].minutes < durationTo) return null;
+  if (Number.isFinite(durationBack) && legs[1].minutes < durationBack) return null;
+
+  /** Timestamp nese místní čas, takže se formátuje jako UTC – jinak by se posun přičetl dvakrát. */
+  const localIso = (ts) => new Date(ts * 1000).toISOString().replace(/\.\d+Z$/, '');
 
   return {
     elapsedTo: legs[0].minutes,
     elapsedBack: legs[1].minutes,
+    arrivesTo: localIso(legs[0].arrivesLocal),
+    arrivesBack: localIso(legs[1].arrivesLocal),
     stopsTo: legs[0].stops,
     stopsBack: legs[1].stops,
   };

@@ -63,7 +63,10 @@ function normalizeOffer(raw, task, config, provider) {
   const pricePerPerson = Number(raw.price);
   if (!Number.isFinite(pricePerPerson) || pricePerPerson <= 0) return null;
   const passengers = config.passengers;
-  const itinerary = parseItinerary(raw.link, raw.duration);
+  const itinerary = parseItinerary(raw.link, raw.duration, {
+    durationTo: raw.duration_to,
+    durationBack: raw.duration_back,
+  });
   return {
     id: `${task.origin.code}-${task.destination.code}-${task.departureDate}-${task.returnDate}`,
     origin: task.origin.code,
@@ -88,6 +91,8 @@ function normalizeOffer(raw, task, config, provider) {
     elapsedTotal: Number.isFinite(raw.duration) ? raw.duration : null,
     elapsedTo: itinerary?.elapsedTo ?? null,
     elapsedBack: itinerary?.elapsedBack ?? null,
+    arrivesTo: itinerary?.arrivesTo ?? null,
+    arrivesBack: itinerary?.arrivesBack ?? null,
     stopsTo: itinerary?.stopsTo ?? null,
     stopsBack: itinerary?.stopsBack ?? null,
     link: provider.bookingLink({

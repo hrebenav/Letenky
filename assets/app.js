@@ -631,6 +631,7 @@ function renderTable(offers) {
       const depTime = clockTime(offer.departureAt);
       const retTime = clockTime(offer.returnAt);
       const via = offer.stopsTo?.length > 2 ? offer.stopsTo.slice(1, -1).join(' · ') : null;
+      const arrival = offer.arrivesTo ? `${dayMonth(offer.arrivesTo.slice(0, 10))} ${clockTime(offer.arrivesTo)}` : null;
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
       if (offer.dealPct === null || offer.dealPct === undefined) {
@@ -647,7 +648,7 @@ function renderTable(offers) {
       return `<tr>
   <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
   <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${travelTime
-    ? `<small class="muted" title="Celková doba cesty tam: od odletu po přistání v cíli, včetně čekání na přestupech.${flightTime ? ` Z toho ve vzduchu ${flightTime}.` : ''}${via ? ` Přes ${via}.` : ''}">na cestě ${travelTime}${via ? ` · přes ${via}` : ''}</small>`
+    ? `<small class="muted" title="Celková doba cesty tam: od odletu z Prahy po přistání v cíli, včetně čekání na přestupech. Posun časových pásem je už započtený, takže 73 h je 73 h na hodinkách.${flightTime ? ` Z toho ve vzduchu ${flightTime}.` : ''}${arrival ? ` Přílet ${arrival} místního času.` : ''}${via ? ` Přes ${via}.` : ''}">na cestě ${travelTime}${arrival ? ` · přílet ${arrival}` : ''}${via ? ` · přes ${via}` : ''}</small>`
     : flightTime
       ? `<small class="muted" title="Čistý čas ve vzduchu. Celkovou dobu cesty se u téhle nabídky nepodařilo zjistit, takže čekání na přestupech v čísle není.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>`
       : ''}</td>

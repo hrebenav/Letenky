@@ -51,9 +51,13 @@ export function createMockProvider({ marker = '', seed = new Date().toISOString(
       const depTs = Math.floor(new Date(`${departureDate}T06:25:00Z`).getTime() / 1000);
       const retTs = Math.floor(new Date(`${returnDate}T06:10:00Z`).getTime() / 1000);
       const chain = (a, b, n) => [a, ...Array.from({ length: n }, (_, i) => ['BUD', 'IST', 'DXB'][i % 3]), b].join('');
-      const leg = (dep, minutes, ports) =>
-        `${dep}${dep + minutes * 60}${String(100 + Math.floor(hash(`f${key}`) * 899)).padStart(6, '0')}${ports}`;
-      const token = `XX${leg(depTs, elapsedTo, chain(origin, destination, transfers))}${leg(retTs, elapsedBack, chain(destination, origin, transfers))}_mock_1`;
+      // Timestampy nesou MÍSTNÍ čas, takže přílet je posunutý o rozdíl pásem;
+      // skutečná doba cesty je v tom šestimístném poli. Mock to musí dělat
+      // stejně, jinak by neodhalil chybu v parsování.
+      const shift = 6 * 3600;   // Evropa → jihovýchodní Asie
+      const leg = (dep, minutes, ports, tzShift) =>
+        `${dep}${dep + minutes * 60 + tzShift}${String(minutes).padStart(6, '0')}${ports}`;
+      const token = `XX${leg(depTs, elapsedTo, chain(origin, destination, transfers), shift)}${leg(retTs, elapsedBack, chain(destination, origin, transfers), -shift)}_mock_1`;
 
       return [
         {
