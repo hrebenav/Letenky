@@ -654,7 +654,7 @@ function renderTable(offers) {
       : ''}</td>
   <td data-col="price" class="num price">${czk(offer.pricePerPerson)}</td>
   <td data-col="perPerson" class="num muted">${czk(offer.priceTotal)}</td>
-  <td data-col="airline">${offer.airlineName ?? '—'}</td>
+  <td data-col="airline">${offer.source === 'serpapi' ? '<span class="src" title="Živý dotaz do Google Flights přes SerpApi. Travelpayouts pro tuhle trasu nic nemá.">GF</span> ' : ''}${offer.airlineName ?? '—'}</td>
   <td data-col="transfers" class="num">${transfers}</td>
   <td data-col="deal" class="num">${deal}</td>
   <td data-col="link"><a class="book" href="${offer.link}" target="_blank" rel="noopener noreferrer">rezervovat ↗</a></td>

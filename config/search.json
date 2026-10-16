@@ -96,5 +96,18 @@
     "timeoutMs": 20000,
     "monthFallback": true,
     "requestsPerSecond": 4
+  },
+  "secondary": {
+    "$comment": "Druhý zdroj (SerpApi / Google Flights) pro destinace, kde Travelpayouts nic nevrací. Free tier je 250 dotazů MĚSÍČNĚ – maxQueriesPerDay × 30 se do něj musí vejít s rezervou. Bez secretu SERPAPI_KEY se celý blok přeskočí.",
+    "enabled": true,
+    "destinations": [
+      "SIN",
+      "PNH",
+      "SAI",
+      "CEB"
+    ],
+    "maxQueriesPerDay": 4,
+    "timeoutMs": 30000,
+    "retries": 2
   }
 }

@@ -15,6 +15,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProvider, parseItinerary } from './lib/travelpayouts.mjs';
+import { createSerpProvider, normalizeSerpOffer, planQueries } from './lib/serpapi.mjs';
 import { createMockProvider } from './lib/mock.mjs';
 import { airlineName } from './lib/airlines.mjs';
 import { annotateDeals, buildBaselines, buildTrend, loadHistory, routeKey } from './lib/history.mjs';
@@ -263,6 +264,62 @@ async function main() {
     }
   }
 
+  // Druhý zdroj: Google Flights přes SerpApi, jen na destinace, kde
+  // Travelpayouts dlouhodobě nic nevrací. Free tier je 250 dotazů měsíčně,
+  // takže se ptáme na jeden termín na destinaci a den a termíny se protáčejí.
+  let serpStats = null;
+  if (config.secondary?.enabled && !MOCK && process.env.SERPAPI_KEY) {
+    const queries = planQueries({
+      destinations: config.secondary.destinations,
+      departureDates: config.departureDates,
+      returnDates: config.returnDates,
+      today,
+      maxQueries: config.secondary.maxQueriesPerDay,
+    });
+    const serp = createSerpProvider({
+      apiKey: process.env.SERPAPI_KEY,
+      currency: config.currency.toUpperCase(),
+      timeoutMs: config.secondary.timeoutMs,
+      retries: config.secondary.retries,
+    });
+    const originCodes = config.origins.map((o) => o.code);
+    let added = 0;
+
+    log(`▶ druhý zdroj (SerpApi): ${queries.length} dotazů`);
+    for (const q of queries) {
+      try {
+        const entries = await serp.search({ origins: originCodes, destination: q.destination, ...q });
+        for (const entry of entries) {
+          const offer = normalizeSerpOffer(entry, { ...q, passengers: config.passengers });
+          if (!offer) continue;
+          // Travelpayouts má přednost – je zdarma a bez kvóty. SerpApi doplňuje.
+          const existing = offersByCombo.get(offer.id);
+          if (!existing || offer.priceTotal < existing.priceTotal) {
+            offersByCombo.set(offer.id, offer);
+            added += 1;
+          }
+        }
+        debug(`✓ SerpApi ${q.destination} ${q.departureDate}/${q.returnDate}: ${entries.length} itinerářů`);
+      } catch (error) {
+        errors.push({
+          route: `*-${q.destination}`,
+          departureDate: q.departureDate,
+          returnDate: q.returnDate,
+          message: `SerpApi: ${String(error.message).slice(0, 200)}`,
+        });
+        // Vyčerpaná kvóta platí pro celý den, nemá smysl pálit další dotazy.
+        if (error.quota) {
+          log('  ⚑ SerpApi: vyčerpaná kvóta, zbytek dotazů se přeskakuje');
+          break;
+        }
+      }
+    }
+    serpStats = { queries: serp.requestCount, offersAdded: added };
+    log(`  SerpApi: ${serp.requestCount} dotazů, ${added} nabídek`);
+  } else if (config.secondary?.enabled && !MOCK) {
+    log('⚑ druhý zdroj přeskočen: chybí SERPAPI_KEY');
+  }
+
   const offers = [...offersByCombo.values()].sort((a, b) => a.priceTotal - b.priceTotal);
   const elapsed = Math.round((Date.now() - started) / 100) / 10;
 
@@ -311,6 +368,7 @@ async function main() {
       requests: provider.requestCount,
       elapsedSeconds: elapsed,
       historyDays: baselines.historyDays,
+      secondary: serpStats,
     },
   };
 

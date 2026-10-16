@@ -460,3 +460,16 @@ tbody tr:hover { background: var(--surface-2); }
 /* Karty destinací si vzaly vlastní sekci, takže v gridu zbyl jen graf –
    ať se roztáhne na plnou šířku místo prázdného sloupce vedle sebe. */
 .grid { grid-template-columns: minmax(0, 1fr); }
+
+/* Značka druhého zdroje: nabídka z Google Flights, ne z cache Aviasales. */
+.src {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--series-1-soft);
+  color: var(--series-1);
+  vertical-align: 1px;
+}
