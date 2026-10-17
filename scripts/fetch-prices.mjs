@@ -14,10 +14,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createProvider } from './lib/travelpayouts.mjs';
+import { createProvider, parseItinerary } from './lib/travelpayouts.mjs';
+import { createSerpProvider, normalizeSerpOffer, planQueries } from './lib/serpapi.mjs';
 import { createMockProvider } from './lib/mock.mjs';
 import { airlineName } from './lib/airlines.mjs';
-import { annotateDeals, buildBaselines, buildTrend, loadHistory, routeKey } from './lib/history.mjs';
+import { annotateDeals, buildBaselines, buildTrend, loadHistory, pickVariants, routeKey } from './lib/history.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -26,7 +27,9 @@ const HISTORY_DIR = path.join(DATA_DIR, 'history');
 const args = new Set(process.argv.slice(2));
 const MOCK = args.has('--mock');
 const SAMPLE = args.has('--sample');
-const DRY_RUN = args.has('--dry-run');
+// SAMPLE běží jen nad zlomkem tras, takže jeho výsledek NIKDY nesmí přepsat
+// ostrý dataset – jinak zůstane latest.json s hrstkou nabídek nebo úplně prázdný.
+const DRY_RUN = args.has('--dry-run') || args.has('--sample');
 const VERBOSE = args.has('--verbose');
 
 const today = new Date().toISOString().slice(0, 10);
@@ -57,10 +60,39 @@ async function runPool(items, concurrency, worker) {
   return results;
 }
 
+/**
+ * Nabídky s víc přestupy, než kolik connesl config, se zahazují ještě před
+ * uložením. Důvod není kosmetický: slepenec přes čtyři letiště není let, který
+ * by přicházel v úvahu, a jako nejlevnější nález by táhl dolů minimum, průměr
+ * i vyhodnocení cenových bomb. Kontroluje se i zpáteční směr.
+ */
+/** Fronta nabídek pro jednu kombinaci trasa+termín, bez duplicit. */
+function addCandidate(candidates, offer) {
+  const list = candidates.get(offer.id) ?? [];
+  const duplicate = list.some(
+    (o) => o.priceTotal === offer.priceTotal && o.transfers === offer.transfers && o.airline === offer.airline,
+  );
+  if (!duplicate) list.push(offer);
+  candidates.set(offer.id, list);
+}
+
+function withinTransferLimit(raw, maxTransfers) {
+  if (!Number.isFinite(maxTransfers)) return true;
+  const there = Number(raw.transfers);
+  const back = Number(raw.return_transfers);
+  if (Number.isFinite(there) && there > maxTransfers) return false;
+  if (Number.isFinite(back) && back > maxTransfers) return false;
+  return true;
+}
+
 function normalizeOffer(raw, task, config, provider) {
   const pricePerPerson = Number(raw.price);
   if (!Number.isFinite(pricePerPerson) || pricePerPerson <= 0) return null;
   const passengers = config.passengers;
+  const itinerary = parseItinerary(raw.link, raw.duration, {
+    durationTo: raw.duration_to,
+    durationBack: raw.duration_back,
+  });
   return {
     id: `${task.origin.code}-${task.destination.code}-${task.departureDate}-${task.returnDate}`,
     origin: task.origin.code,
@@ -77,8 +109,18 @@ function normalizeOffer(raw, task, config, provider) {
     flightNumber: raw.flight_number ?? null,
     transfers: Number.isFinite(raw.transfers) ? raw.transfers : null,
     returnTransfers: Number.isFinite(raw.return_transfers) ? raw.return_transfers : null,
+    // duration_to / duration_back je čistý čas ve vzduchu. Skutečnou dobu cesty
+    // včetně čekání na přestupech nese až `duration` (součet obou směrů) a
+    // timestampy v odkazu, odkud ji parseItinerary rozpadne po směrech.
     durationTo: Number.isFinite(raw.duration_to) ? raw.duration_to : null,
     durationBack: Number.isFinite(raw.duration_back) ? raw.duration_back : null,
+    elapsedTotal: Number.isFinite(raw.duration) ? raw.duration : null,
+    elapsedTo: itinerary?.elapsedTo ?? null,
+    elapsedBack: itinerary?.elapsedBack ?? null,
+    arrivesTo: itinerary?.arrivesTo ?? null,
+    arrivesBack: itinerary?.arrivesBack ?? null,
+    stopsTo: itinerary?.stopsTo ?? null,
+    stopsBack: itinerary?.stopsBack ?? null,
     link: provider.bookingLink({
       origin: task.origin.code,
       destination: task.destination.code,
@@ -89,14 +131,37 @@ function normalizeOffer(raw, task, config, provider) {
   };
 }
 
+/** Trasy, které v posledním ostrém běhu vrátily nabídku. Prázdné pole, když historii nemáme. */
+async function provenRoutes() {
+  try {
+    const latest = JSON.parse(await readFile(path.join(DATA_DIR, 'latest.json'), 'utf8'));
+    if (latest.mode !== 'live') return [];
+    const seen = new Map();
+    for (const o of latest.offers ?? []) seen.set(`${o.origin}-${o.destination}`, { origin: o.origin, destination: o.destination });
+    return [...seen.values()].slice(0, 2);
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   const config = JSON.parse(await readFile(path.join(ROOT, 'config', 'search.json'), 'utf8'));
 
   let origins = config.origins;
   let destinations = config.destinations;
   if (SAMPLE) {
-    origins = origins.slice(0, 1);
-    destinations = destinations.slice(0, 2);
+    // Prvních pár tras z configu bývá na cache chudých, takže vzorek často
+    // skončil s nulou nabídek a neověřil vůbec nic. Když máme poslední běh,
+    // vybereme radši trasu, která posledně data vrátila.
+    const proven = await provenRoutes();
+    if (proven.length) {
+      const codes = { origins: new Set(proven.map((r) => r.origin)), destinations: new Set(proven.map((r) => r.destination)) };
+      origins = origins.filter((o) => codes.origins.has(o.code));
+      destinations = destinations.filter((d) => codes.destinations.has(d.code));
+    } else {
+      origins = origins.slice(0, 1);
+      destinations = destinations.slice(0, 2);
+    }
     log('⚑ SAMPLE režim: jen', origins.map((o) => o.code).join(','), '→', destinations.map((d) => d.code).join(','));
   }
 
@@ -128,7 +193,8 @@ async function main() {
 
   const started = Date.now();
   const errors = [];
-  const offersByCombo = new Map();
+  // Klíč je kombinace trasa+termín, hodnota pole kandidátů na ni.
+  const candidates = new Map();
   let emptyCount = 0;
 
   const results = await runPool(tasks, config.fetch.concurrency, async (task) => {
@@ -141,6 +207,8 @@ async function main() {
     return { task, raw };
   });
 
+  let dumpedRaw = false;
+  let rawSample = null;
   for (const result of results) {
     if (!result.ok) {
       const { origin, destination, departureDate, returnDate } = result.item;
@@ -158,10 +226,29 @@ async function main() {
       emptyCount += 1;
       continue;
     }
+    // Nejdřív vyhodíme nabídky nad limitem přestupů, teprve pak hledáme minimum –
+    // jinak by se jako "nejlevnější" uložil slepenec, který stejně nechceme.
+    const allowed = raw.filter((r) => withinTransferLimit(r, config.maxTransfers));
+    if (!allowed.length) {
+      emptyCount += 1;
+      continue;
+    }
     // API řadíme podle ceny, ale pro jistotu vybíráme minimum sami.
-    const cheapest = raw.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
-    const offer = normalizeOffer(cheapest, task, config, provider);
-    if (offer) offersByCombo.set(offer.id, offer);
+    const cheapest = allowed.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
+    // Ve verbose režimu vypíšeme jednu syrovou odpověď se všemi poli. Slouží
+    // ke kontrole, co API skutečně posílá – např. jestli existuje čas příletu,
+    // ze kterého by šla spočítat celková doba cesty včetně přestupů.
+    if (VERBOSE && !dumpedRaw) {
+      dumpedRaw = true;
+      console.log('   RAW odpověď API (všechna pole):', JSON.stringify(cheapest, null, 2));
+      rawSample = { route: `${task.origin.code}-${task.destination.code}`, raw: cheapest };
+    }
+    // Všechny přijatelné nabídky jdou do fronty; která se nakonec zobrazí,
+    // rozhodne pickVariants – nejlevnější nemusí být ta, kterou chce člověk letět.
+    for (const item of allowed) {
+      const offer = normalizeOffer(item, task, config, provider);
+      if (offer) addCandidate(candidates, offer);
+    }
   }
 
   // Záložní měsíční dotaz pro trasy, kde přesné termíny nevrátily vůbec nic.
@@ -174,7 +261,7 @@ async function main() {
     for (const origin of origins) {
       for (const destination of destinations) {
         const key = `${origin.code}-${destination.code}`;
-        const hasAny = [...offersByCombo.values()].some((o) => routeKey(o) === key);
+        const hasAny = [...candidates.values()].some((list) => list.some((o) => routeKey(o) === key));
         if (!hasAny) emptyRoutes.push({ origin, destination });
       }
     }
@@ -204,17 +291,79 @@ async function main() {
           const dep = String(item.departure_at ?? '').slice(0, 10);
           const ret = String(item.return_at ?? '').slice(0, 10);
           if (!depSet.has(dep) || !retSet.has(ret)) continue;
+          if (!withinTransferLimit(item, config.maxTransfers)) continue;
           const task = { origin, destination, departureDate: dep, returnDate: ret };
           const offer = normalizeOffer(item, task, config, provider);
-          if (!offer) continue;
-          const existing = offersByCombo.get(offer.id);
-          if (!existing || offer.priceTotal < existing.priceTotal) offersByCombo.set(offer.id, offer);
+          if (offer) addCandidate(candidates, offer);
         }
       }
     }
   }
 
-  const offers = [...offersByCombo.values()].sort((a, b) => a.priceTotal - b.priceTotal);
+  // Druhý zdroj: Google Flights přes SerpApi, jen na destinace, kde
+  // Travelpayouts dlouhodobě nic nevrací. Free tier je 250 dotazů měsíčně,
+  // takže se ptáme na jeden termín na destinaci a den a termíny se protáčejí.
+  let serpStats = null;
+  if (config.secondary?.enabled && !MOCK && process.env.SERPAPI_KEY) {
+    const queries = planQueries({
+      destinations: config.secondary.destinations,
+      departureDates: config.departureDates,
+      returnDates: config.returnDates,
+      today,
+      maxQueries: config.secondary.maxQueriesPerDay,
+    });
+    const serp = createSerpProvider({
+      apiKey: process.env.SERPAPI_KEY,
+      currency: config.currency.toUpperCase(),
+      timeoutMs: config.secondary.timeoutMs,
+      retries: config.secondary.retries,
+    });
+    const originCodes = config.origins.map((o) => o.code);
+    let added = 0;
+
+    log(`▶ druhý zdroj (SerpApi): ${queries.length} dotazů`);
+    for (const q of queries) {
+      try {
+        const entries = await serp.search({
+          origins: originCodes,
+          destination: q.destination,
+          ...q,
+          maxTransfers: config.maxTransfers,
+        });
+        for (const entry of entries) {
+          const offer = normalizeSerpOffer(entry, {
+            ...q,
+            passengers: config.passengers,
+            maxTransfers: config.maxTransfers,
+          });
+          if (!offer) continue;
+          addCandidate(candidates, offer);
+          added += 1;
+        }
+        debug(`✓ SerpApi ${q.destination} ${q.departureDate}/${q.returnDate}: ${entries.length} itinerářů`);
+      } catch (error) {
+        errors.push({
+          route: `*-${q.destination}`,
+          departureDate: q.departureDate,
+          returnDate: q.returnDate,
+          message: `SerpApi: ${String(error.message).slice(0, 200)}`,
+        });
+        // Vyčerpaná kvóta platí pro celý den, nemá smysl pálit další dotazy.
+        if (error.quota) {
+          log('  ⚑ SerpApi: vyčerpaná kvóta, zbytek dotazů se přeskakuje');
+          break;
+        }
+      }
+    }
+    serpStats = { queries: serp.requestCount, offersAdded: added };
+    log(`  SerpApi: ${serp.requestCount} dotazů, ${added} nabídek`);
+  } else if (config.secondary?.enabled && !MOCK) {
+    log('⚑ druhý zdroj přeskočen: chybí SERPAPI_KEY');
+  }
+
+  const offers = [...candidates.values()]
+    .flatMap((list) => pickVariants(list, config.variantsPerCombo ?? 3))
+    .sort((a, b) => a.priceTotal - b.priceTotal);
   const elapsed = Math.round((Date.now() - started) / 100) / 10;
 
   log(`✔ hotovo za ${elapsed}s: ${offers.length} nabídek, ${emptyCount} kombinací bez dat, ${errors.length} chyb, ${provider.requestCount} requestů`);
@@ -262,6 +411,7 @@ async function main() {
       requests: provider.requestCount,
       elapsedSeconds: elapsed,
       historyDays: baselines.historyDays,
+      secondary: serpStats,
     },
   };
 
@@ -272,6 +422,7 @@ async function main() {
       destinations,
       departureDates: config.departureDates,
       returnDates: config.returnDates,
+      maxTransfers: config.maxTransfers ?? null,
     },
     baselines: baselines.byRoute,
     offers: annotated,
@@ -294,6 +445,14 @@ async function main() {
       `Nenalezena ani jedna nabídka a ${errors.length} kombinací skončilo chybou – data zůstávají beze změny. ` +
         `První chyba: ${errors[0].message}`,
     );
+  }
+
+  // Syrová odpověď do souboru, ne jen do logu – logy Actions se servírují
+  // z jiného serveru a přes API je nepřečteme.
+  if (VERBOSE && rawSample) {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(path.join(DATA_DIR, '_debug-raw.json'), JSON.stringify(rawSample, null, 2));
+    log('⚑ syrová odpověď uložena do data/_debug-raw.json');
   }
 
   if (DRY_RUN) {

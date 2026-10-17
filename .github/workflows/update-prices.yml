@@ -45,6 +45,8 @@ jobs:
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+          # Druhý zdroj. Bez něj běh pokračuje, jen se přeskočí.
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: |
           case "${{ inputs.mode || 'live' }}" in
             mock)   node scripts/fetch-prices.mjs --mock ;;

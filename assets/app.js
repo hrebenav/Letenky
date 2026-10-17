@@ -26,8 +26,12 @@ const state = {
 
 const czkFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 });
 const czk = (value) => `${czkFormat.format(Math.round(value))} Kč`;
+// Zkratka na tisíce počítá s jedním desetinným místem, takže ji nesmí tisknout
+// czkFormat (0 desetinných). Jinak se při úzkém rozpětí cen slijí všechny
+// značky osy do jedné hodnoty – "38 tis., 38 tis., 37 tis., 37 tis.".
+const thousandsFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
 const czkShort = (value) =>
-  value >= 10000 ? `${czkFormat.format(Math.round(value / 100) / 10)} tis.` : czkFormat.format(value);
+  value >= 10000 ? `${thousandsFormat.format(Math.round(value / 100) / 10)} tis.` : czkFormat.format(value);
 
 function dayMonth(isoDate) {
   const [y, m, d] = isoDate.split('-');
@@ -36,12 +40,21 @@ function dayMonth(isoDate) {
 function dayMonthYear(isoDate) {
   return `${dayMonth(isoDate)} ${isoDate.slice(0, 4)}`;
 }
+/** Hodina z ISO časové značky, v místním čase letiště (offset je v datech). */
+function clockTime(iso) {
+  if (!iso) return null;
+  const m = String(iso).match(/T(\d{2}):(\d{2})/);
+  return m ? `${Number(m[1])}:${m[2]}` : null;
+}
+
 function duration(minutes) {
   if (!Number.isFinite(minutes)) return null;
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
 const cityName = (code) => state.originNames.get(code) ?? state.destinationNames.get(code) ?? code;
 const routeOf = (offer) => `${offer.origin}-${offer.destination}`;
+/** Kombinace trasa+termín bez pořadového čísla varianty (id končí na "#0", "#1"…). */
+const comboOf = (offer) => String(offer.id).split('#')[0];
 
 /* ---------- načtení dat ---------- */
 
@@ -70,6 +83,7 @@ async function init() {
 
   buildChips();
   bindControls();
+  applyTransferCap();
   renderHeader();
   render();
   el('app').setAttribute('aria-busy', 'false');
@@ -116,6 +130,19 @@ function renderHeader() {
     );
   } else if (latest.stats.errors > 0) {
     showBanner(`Poslední běh skončil s ${latest.stats.errors} chybami u jednotlivých kombinací – ostatní data jsou v pořádku.`);
+  }
+}
+
+/** Přepíše první volbu filtru přestupů podle stropu, který platí v datech. */
+function applyTransferCap() {
+  const cap = state.latest.config.maxTransfers;
+  const select = el('filter-transfers');
+  const any = select.querySelector('option[value=""]');
+  if (!Number.isFinite(cap)) return;
+  if (any) any.textContent = `max ${cap} (vše, co sledujeme)`;
+  for (const option of select.querySelectorAll('option[value]')) {
+    const v = Number(option.value);
+    if (Number.isFinite(v) && v > cap) option.remove();
   }
 }
 
@@ -229,11 +256,19 @@ function currentOffers() {
   });
 
   if (filters.bestPerRoute) {
-    const best = new Map();
+    // Nejdřív se pro každou trasu najde nejvýhodnější termín, pak se nechají
+    // VŠECHNY jeho varianty. Kdyby se vybírala jedna nabídka, zmizely by
+    // dražší, ale pohodlnější alternativy – a kvůli těm se sbírají.
+    const bestCombo = new Map();
     for (const offer of offers) {
       const key = routeOf(offer);
-      const current = best.get(key);
-      if (!current || offer.priceTotal < current.priceTotal) best.set(key, offer);
+      const current = bestCombo.get(key);
+      if (!current || offer.priceTotal < current.priceTotal) bestCombo.set(key, offer);
+    }
+    const keepCombos = new Set([...bestCombo.values()].map((o) => comboOf(o)));
+    const best = new Map();
+    for (const offer of offers) {
+      if (keepCombos.has(comboOf(offer))) best.set(offer.id, offer);
     }
     offers = [...best.values()];
   }
@@ -243,6 +278,10 @@ function currentOffers() {
     deal: (a, b) => (b.dealPct ?? -999) - (a.dealPct ?? -999) || a.priceTotal - b.priceTotal,
     departure: (a, b) => a.departureDate.localeCompare(b.departureDate) || a.priceTotal - b.priceTotal,
     route: (a, b) => routeOf(a).localeCompare(routeOf(b)) || a.priceTotal - b.priceTotal,
+    // Nabídky bez známé doby cesty nebo počtu přestupů padají na konec –
+    // jinak by se tvářily jako nejrychlejší jen proto, že údaj chybí.
+    duration: (a, b) => (a.elapsedTo ?? Infinity) - (b.elapsedTo ?? Infinity) || a.priceTotal - b.priceTotal,
+    stops: (a, b) => (a.transfers ?? Infinity) - (b.transfers ?? Infinity) || a.priceTotal - b.priceTotal,
   };
   return offers.sort(sorters[filters.sort] ?? sorters.price);
 }
@@ -261,9 +300,9 @@ function render() {
 function renderTiles(offers) {
   const cheapest = offers[0] && offers.reduce((a, b) => (b.priceTotal < a.priceTotal ? b : a));
   if (cheapest) {
-    el('kpi-today-value').textContent = czk(cheapest.priceTotal);
+    el('kpi-today-value').textContent = czk(cheapest.pricePerPerson);
     el('kpi-today-note').textContent =
-      `${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} · ${dayMonth(cheapest.departureDate)}–${dayMonth(cheapest.returnDate)} · ${czk(cheapest.pricePerPerson)} za osobu`;
+      `${cityName(cheapest.origin)} → ${cityName(cheapest.destination)} · ${dayMonth(cheapest.departureDate)}–${dayMonth(cheapest.returnDate)} · ${czk(cheapest.priceTotal)} za ${passengers()} ${passengers() < 5 ? 'osoby' : 'osob'}`;
   } else {
     el('kpi-today-value').textContent = '—';
     el('kpi-today-note').textContent = 'pro zvolené filtry nic nenalezeno';
@@ -295,6 +334,11 @@ function renderTiles(offers) {
 }
 
 /** Časová řada nejnižší ceny pro aktuálně vybrané trasy. */
+/** Počet cestujících, pro který fetch skript počítal priceTotal. */
+function passengers() {
+  return state.latest?.passengers || 1;
+}
+
 function trendSeries() {
   const routes = new Set(selectedRoutes());
   return (state.summary.trend ?? []).map((day) => {
@@ -305,7 +349,9 @@ function trendSeries() {
       count += 1;
       if (min === null || price < min) min = price;
     }
-    return { date: day.date, value: min, count };
+    // summary.json drží ceny za celou skupinu; dashboard mluví za osobu,
+    // tak se dělí jednou tady a všechno dál už je ve stejné jednotce.
+    return { date: day.date, value: min === null ? null : min / passengers(), count };
   });
 }
 
@@ -330,7 +376,7 @@ function renderChart() {
   const totalRoutes = state.latest.config.origins.length * state.latest.config.destinations.length;
 
   el('chart-sub').textContent =
-    `nejnižší cena za ${state.latest.passengers} osoby, ${routeCount === totalRoutes ? 'všechny trasy' : `vybrané trasy (${routeCount})`}`;
+    `nejnižší cena za osobu, ${routeCount === totalRoutes ? 'všechny trasy' : `vybrané trasy (${routeCount})`}`;
 
   if (points.length < 2) {
     canvas.innerHTML =
@@ -359,7 +405,13 @@ function renderChart() {
   const x = (i) => margin.left + (points.length === 1 ? plotWidth / 2 : (i / (points.length - 1)) * plotWidth);
   const y = (v) => margin.top + plotHeight - ((v - yMin) / (yMax - yMin)) * plotHeight;
 
-  const ticks = niceTicks(yMin, yMax, 4);
+  const seenTickLabels = new Set();
+  const ticks = niceTicks(yMin, yMax, 4).filter((t) => {
+    const label = czkShort(t);
+    if (seenTickLabels.has(label)) return false;
+    seenTickLabels.add(label);
+    return true;
+  });
   const minPoint = points.reduce((a, b) => (b.value < a.value ? b : a));
   const minIndex = points.indexOf(minPoint);
   const lastIndex = points.length - 1;
@@ -393,8 +445,15 @@ function renderChart() {
     `<circle class="series-dot" cx="${x(lastIndex).toFixed(1)}" cy="${y(lastValue).toFixed(1)}" r="4.5"></circle>`,
     `<text class="endpoint-label" x="${(x(lastIndex) + 9).toFixed(1)}" y="${(y(lastValue) + 4).toFixed(1)}">${czk(lastValue)}</text>`,
   ];
-  if (minIndex !== lastIndex) {
-    const anchor = x(minIndex) > margin.left + plotWidth * 0.75 ? 'end' : 'middle';
+  // U ploché křivky (všechny dny stejná cena) je značka minima jen šum –
+  // hodnotu už nese popisek na konci. Navíc by se její text tiskl přes osu.
+  if (minIndex !== lastIndex && rawMax > rawMin) {
+    // U krajních bodů se text zarovná dovnitř grafu, ať nepřeteče přes osu.
+    const anchor = x(minIndex) > margin.left + plotWidth * 0.75
+      ? 'end'
+      : x(minIndex) < margin.left + plotWidth * 0.1
+        ? 'start'
+        : 'middle';
     labels.push(
       `<circle class="series-dot series-dot--deal" cx="${x(minIndex).toFixed(1)}" cy="${y(minPoint.value).toFixed(1)}" r="4.5"></circle>`,
       `<text class="axis-label axis-label--num" x="${x(minIndex).toFixed(1)}" y="${(y(minPoint.value) + 18).toFixed(1)}" text-anchor="${anchor}">min ${czkShort(minPoint.value)}</text>`,
@@ -552,12 +611,12 @@ function card(offer, cheapest) {
   return `<article class="dest-card${active ? ' is-active' : ''}" data-code="${offer.destination}"
     style="--accent-light:${accent.light};--accent-dark:${accent.dark}"
     tabindex="0" role="button" aria-pressed="${active}"
-    aria-label="${cityName(offer.destination)} od ${czk(offer.priceTotal)} za 2 osoby, filtrovat">
+    aria-label="${cityName(offer.destination)} od ${czk(offer.pricePerPerson)} za osobu, filtrovat">
   <div class="dest-card__media">${destinationArt(offer.destination)}</div>
   <div class="dest-card__body">
     <h3 class="dest-card__title">${cityName(offer.destination)}</h3>
     <p class="dest-card__country">${countryOf(offer.destination)}</p>
-    <p class="dest-card__price">${czk(offer.priceTotal)}</p>
+    <p class="dest-card__price">${czk(offer.pricePerPerson)}</p>
     <p class="dest-card__meta">z ${cityName(offer.origin)} · ${transfers}</p>
     <div class="dest-card__flags">${flags.join('')}</div>
   </div>
@@ -578,7 +637,7 @@ function renderTable(offers) {
     offers.length === 0
       ? 'nic nenalezeno'
       : `${shown.length} z ${offers.length} nabídek` +
-        (state.filters.bestPerRoute ? ' · jen nejlevnější termín pro každou trasu' : '') +
+        (state.filters.bestPerRoute ? ' · nejvýhodnější termín pro každou trasu, včetně variant' : '') +
         (underTarget ? ` · ${underTarget} pod cílovou cenou ${czk(state.latest.targetPriceTotal)}` : '');
 
   body.innerHTML = shown
@@ -593,7 +652,14 @@ function renderTable(offers) {
       // U nabídky PRG→HAN se 3 přestupy hlásí API 17 h 10 min, zatímco reálná
       // cesta trvá 35 h 50 min – zbytek je čekání na přestupech. Popisek to
       // proto musí říct nahlas, jinak si to každý přečte jako celkovou dobu.
+      // Hlavní je skutečná doba cesty (let + čekání na přestupech). Čistý letový
+      // čas je až záloha pro nabídky, u kterých se rozpad z odkazu nepovedl.
+      const travelTime = duration(offer.elapsedTo);
       const flightTime = duration(offer.durationTo);
+      const depTime = clockTime(offer.departureAt);
+      const retTime = clockTime(offer.returnAt);
+      const via = offer.stopsTo?.length > 2 ? offer.stopsTo.slice(1, -1).join(' · ') : null;
+      const arrival = offer.arrivesTo ? `${dayMonth(offer.arrivesTo.slice(0, 10))} ${clockTime(offer.arrivesTo)}` : null;
       // Badge nese ikonu i text – význam nikdy nestojí jen na barvě.
       let deal;
       if (offer.dealPct === null || offer.dealPct === undefined) {
@@ -607,12 +673,24 @@ function renderTable(offers) {
         deal = low || target ? `<span class="badges">${main}${low}${target}</span>` : main;
       }
 
-      return `<tr>
-  <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}<small>${offer.origin} → ${offer.destination}</small></td>
-  <td data-col="dates">${dayMonth(offer.departureDate)} – ${dayMonth(offer.returnDate)} ${offer.returnDate.slice(0, 4)}${flightTime ? `<small class="muted" title="Čistý čas ve vzduchu podle API. Čekání na přestupech se nepočítá – u víc přestupů bývá reálná cesta i dvakrát delší.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>` : ''}</td>
-  <td data-col="price" class="num price">${czk(offer.priceTotal)}</td>
-  <td data-col="perPerson" class="num muted">${czk(offer.pricePerPerson)}</td>
-  <td data-col="airline">${offer.airlineName ?? '—'}</td>
+      // Štítek říká, proč je varianta v tabulce, i když není nejlevnější.
+      const VARIANTS = {
+        fewestStops: ['nejmíň přestupů', 'Dráž než nejlevnější varianta na stejné trase a termín, ale s míň přestupy.'],
+        fastest: ['nejrychlejší', 'Dráž než nejlevnější varianta na stejné trase a termín, ale cesta je kratší.'],
+      };
+      const v = VARIANTS[offer.variant];
+      const variantTag = v ? `<span class="variant" title="${v[1]}">${v[0]}</span>` : '';
+
+      return `<tr${offer.variant && offer.variant !== 'cheapest' ? ' class="is-variant"' : ''}>
+  <td data-col="route" class="route">${cityName(offer.origin)} → ${cityName(offer.destination)}${variantTag}<small>${offer.origin} → ${offer.destination}</small></td>
+  <td data-col="dates">${dayMonth(offer.departureDate)}${depTime ? ` <span class="muted">${depTime}</span>` : ''} – ${dayMonth(offer.returnDate)}${retTime ? ` <span class="muted">${retTime}</span>` : ''} ${offer.returnDate.slice(0, 4)}${travelTime
+    ? `<small class="muted" title="Celková doba cesty tam: od odletu z Prahy po přistání v cíli, včetně čekání na přestupech. Posun časových pásem je už započtený, takže 73 h je 73 h na hodinkách.${flightTime ? ` Z toho ve vzduchu ${flightTime}.` : ''}${arrival ? ` Přílet ${arrival} místního času.` : ''}${via ? ` Přes ${via}.` : ''}">na cestě ${travelTime}${arrival ? ` · přílet ${arrival}` : ''}${via ? ` · přes ${via}` : ''}</small>`
+    : flightTime
+      ? `<small class="muted" title="Čistý čas ve vzduchu. Celkovou dobu cesty se u téhle nabídky nepodařilo zjistit, takže čekání na přestupech v čísle není.">ve vzduchu ${flightTime}${(offer.transfers ?? 0) > 1 ? ' + přestupy' : ''}</small>`
+      : ''}</td>
+  <td data-col="price" class="num price">${czk(offer.pricePerPerson)}</td>
+  <td data-col="perPerson" class="num muted">${czk(offer.priceTotal)}</td>
+  <td data-col="airline">${offer.source === 'serpapi' ? '<span class="src" title="Živý dotaz do Google Flights přes SerpApi. Travelpayouts pro tuhle trasu nic nemá.">GF</span> ' : ''}${offer.airlineName ?? '—'}</td>
   <td data-col="transfers" class="num">${transfers}</td>
   <td data-col="deal" class="num">${deal}</td>
   <td data-col="link"><a class="book" href="${offer.link}" target="_blank" rel="noopener noreferrer">rezervovat ↗</a></td>

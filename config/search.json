@@ -2,6 +2,10 @@
   "$comment": "Jediné místo, kde se mění parametry hledání. Po úpravě commitni – workflow si to načte při dalším běhu.",
   "currency": "czk",
   "passengers": 2,
+  "maxTransfers": 2,
+  "$maxTransfers": "Nabídky s víc přestupy se vůbec neukládají – nejsou to lety, které by přicházely v úvahu, a zkreslovaly by minimum, průměr i cenové bomby. null = bez omezení.",
+  "variantsPerCombo": 3,
+  "$variantsPerCombo": "Kolik variant na kombinaci trasa+termín se uloží. Vždy nejlevnější, k tomu nejmíň přestupů a nejrychlejší – ale jen když jsou skutečně lepší.",
   "market": "cz",
   "origins": [
     {
@@ -96,5 +100,18 @@
     "timeoutMs": 20000,
     "monthFallback": true,
     "requestsPerSecond": 4
+  },
+  "secondary": {
+    "$comment": "Druhý zdroj (SerpApi / Google Flights) pro destinace, kde Travelpayouts nic nevrací. Free tier je 250 dotazů MĚSÍČNĚ – maxQueriesPerDay × 30 se do něj musí vejít s rezervou. Bez secretu SERPAPI_KEY se celý blok přeskočí.",
+    "enabled": true,
+    "destinations": [
+      "SIN",
+      "PNH",
+      "SAI",
+      "CEB"
+    ],
+    "maxQueriesPerDay": 4,
+    "timeoutMs": 30000,
+    "retries": 2
   }
 }

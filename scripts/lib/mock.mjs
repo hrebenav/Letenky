@@ -39,8 +39,40 @@ export function createMockProvider({ marker = '', seed = new Date().toISOString(
         price = Math.round((base * 0.6) / 10) * 10;
       }
       const transfers = hash(`t${key}`) < 0.25 ? 0 : hash(`t${key}`) < 0.8 ? 1 : 2;
-      return [
-        {
+      const durationTo = 780 + Math.round(hash(`d${key}`) * 900);
+      const durationBack = 780 + Math.round(hash(`e${key}`) * 900);
+      // Skutečná doba cesty = let + čekání na přestupech. Mock to musí umět taky,
+      // jinak by se nedal ověřit rozpad z odkazu (parseItinerary).
+      const waitTo = transfers * (90 + Math.round(hash(`w${key}`) * 600));
+      const waitBack = transfers * (90 + Math.round(hash(`v${key}`) * 600));
+      const elapsedTo = durationTo + waitTo;
+      const elapsedBack = durationBack + waitBack;
+      // Odkaz ve stejném tvaru, jaký posílá API: dvojice timestampů + kódy letišť.
+      const depTs = Math.floor(new Date(`${departureDate}T06:25:00Z`).getTime() / 1000);
+      const retTs = Math.floor(new Date(`${returnDate}T06:10:00Z`).getTime() / 1000);
+      const chain = (a, b, n) => [a, ...Array.from({ length: n }, (_, i) => ['BUD', 'IST', 'DXB'][i % 3]), b].join('');
+      // Timestampy nesou MÍSTNÍ čas, takže přílet je posunutý o rozdíl pásem;
+      // skutečná doba cesty je v tom šestimístném poli. Mock to musí dělat
+      // stejně, jinak by neodhalil chybu v parsování.
+      const shift = 6 * 3600;   // Evropa → jihovýchodní Asie
+      const leg = (dep, minutes, ports, tzShift) =>
+        `${dep}${dep + minutes * 60 + tzShift}${String(minutes).padStart(6, '0')}${ports}`;
+      const token = `XX${leg(depTs, elapsedTo, chain(origin, destination, transfers), shift)}${leg(retTs, elapsedBack, chain(destination, origin, transfers), -shift)}_mock_1`;
+
+      // Skutečné API vrací na dotaz víc nabídek, mezi kterými je co vybírat.
+      // Mock musí taky, jinak by se nedaly otestovat varianty (nejrychlejší,
+      // nejmíň přestupů) – s jednou nabídkou na kombinaci není z čeho vybírat.
+      const variants = [
+        { dPrice: 0, dTransfers: 0, dWait: 0 },
+        { dPrice: Math.round(price * 0.12), dTransfers: -1, dWait: -0.5 },
+        { dPrice: Math.round(price * 0.28), dTransfers: -1, dWait: -0.8 },
+      ];
+
+      return variants.map(({ dPrice, dTransfers, dWait }) => {
+        const tr = Math.max(0, transfers + dTransfers);
+        const eTo = durationTo + Math.round(waitTo * (1 + dWait));
+        const eBack = durationBack + Math.round(waitBack * (1 + dWait));
+        return {
           origin,
           destination,
           origin_airport: origin,
@@ -50,12 +82,15 @@ export function createMockProvider({ marker = '', seed = new Date().toISOString(
           flight_number: String(100 + Math.floor(hash(`f${key}`) * 899)),
           departure_at: `${departureDate}T${String(6 + Math.floor(hash(`h${key}`) * 15)).padStart(2, '0')}:25:00+01:00`,
           return_at: `${returnDate}T${String(6 + Math.floor(hash(`r${key}`) * 15)).padStart(2, '0')}:10:00+07:00`,
-          transfers,
-          return_transfers: transfers,
-          duration_to: 780 + Math.round(hash(`d${key}`) * 900),
-          duration_back: 780 + Math.round(hash(`e${key}`) * 900),
-        },
-      ];
+          price: price + dPrice,
+          transfers: tr,
+          return_transfers: tr,
+          duration_to: durationTo,
+          duration_back: durationBack,
+          duration: eTo + eBack,
+          link: `/search/${origin}${destination}?t=XX${leg(depTs, eTo, chain(origin, destination, tr), shift)}${leg(retTs, eBack, chain(destination, origin, tr), -shift)}_mock_1`,
+        };
+      });
     },
     async searchMonth() {
       requestCount += 1;
