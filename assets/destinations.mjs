@@ -15,6 +15,11 @@
 export const ACCENTS = {
   KUL: { light: '#2a78d6', dark: '#3987e5' },  // modrá
   MNL: { light: '#eb6834', dark: '#d95926' },  // oranžová
+  // Devátá barva nad rámec osmislotové palety. Pozice mezi oranžovou a
+  // tyrkysovou není náhodná – v jiném pořadí (hlavně vedle červené) propadá
+  // v tmavém režimu pod práh rozlišitelnosti. Ověřeno validátorem v obou
+  // režimech; stávajícím barvám nezhoršuje žádnou dvojici.
+  TYO: { light: '#b0338c', dark: '#c75bb0' },  // purpurová
   HAN: { light: '#1baf7a', dark: '#199e70' },  // tyrkysová
   SGN: { light: '#eda100', dark: '#c98500' },  // žlutá
   SIN: { light: '#e87ba4', dark: '#d55181' },  // purpurová
@@ -53,6 +58,16 @@ const MNL = `${SKY}
 <rect x="44" y="52" width="4" height="26" fill="currentColor" opacity="0.8"/>
 <path d="M46 52c-12-1-19 4-22 12 6-6 13-8 22-7zM46 52c12-1 19 4 22 12-6-6-13-8-22-7zM46 51c-9-5-11-11-8-18 1 7 4 12 10 15zM46 51c9-5 11-10 9-17-2 7-5 11-10 14z" fill="currentColor" opacity="0.8"/>
 ${GROUND}`
+
+/* Tokio – Fudži se zasněženým vrcholem a brána torii v popředí. */
+const TYO = `${SKY}
+<circle cx="130" cy="20" r="9" fill="currentColor" opacity="0.18"/>
+<path d="M14 78 L66 26 L94 26 L146 78 Z" fill="currentColor" opacity="0.85"/>
+<path d="M66 26h28l10 13-9-5-7 7-8-8-8 7-8-6z" fill="currentColor" opacity="0.35"/>
+<path d="M26 78V46M58 78V46" stroke="currentColor" stroke-width="5" fill="none"/>
+<path d="M16 44h52l-3 6H19z" fill="currentColor"/>
+<rect x="20" y="54" width="44" height="4" fill="currentColor"/>
+<rect x="0" y="78" width="160" height="14" fill="currentColor" opacity="0.26"/>`;
 
 /* Hanoj – Želví věž na hladině Hoan Kiem: tři ustupující patra s přesahy. */
 const HAN = `${SKY}
@@ -129,7 +144,7 @@ const CEB = `${SKY}
 <rect x="0" y="80" width="160" height="12" fill="currentColor" opacity="0.3"/>
 <path d="M8 86h26M52 86h30M100 86h28" stroke="currentColor" stroke-width="1.5" opacity="0.35" fill="none"/>`;
 
-const ART = { KUL, MNL, HAN, SGN, SIN, PNH, SAI, CEB };
+const ART = { KUL, MNL, TYO, HAN, SGN, SIN, PNH, SAI, CEB };
 
 /** Neznámý kód dostane neutrální siluetu místo prázdna. */
 const FALLBACK = `${SKY}
