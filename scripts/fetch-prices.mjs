@@ -147,8 +147,12 @@ async function provenRoutes() {
 async function main() {
   const config = JSON.parse(await readFile(path.join(ROOT, 'config', 'search.json'), 'utf8'));
 
-  let origins = config.origins;
-  let destinations = config.destinations;
+  // Letiště se dá v configu vypnout příznakem "enabled": false místo mazání.
+  // Pauza v sledování tak nestojí celý záznam – jméno, země i barva na webu
+  // zůstanou a vrácení je otázka jednoho slova.
+  const active = (list) => list.filter((x) => x.enabled !== false);
+  let origins = active(config.origins);
+  let destinations = active(config.destinations);
   if (SAMPLE) {
     // Prvních pár tras z configu bývá na cache chudých, takže vzorek často
     // skončil s nulou nabídek a neověřil vůbec nic. Když máme poslední běh,

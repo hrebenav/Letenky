@@ -43,12 +43,16 @@
     {
       "code": "HAN",
       "name": "Hanoj",
-      "country": "Vietnam"
+      "country": "Vietnam",
+      "enabled": false,
+      "$pozastaveno": "Vietnam dočasně vypnutý (17. 10. 2026). Vrátí se smazáním \"enabled\": false – barva i ilustrace zůstávají."
     },
     {
       "code": "SGN",
       "name": "Ho Či Minovo Město",
-      "country": "Vietnam"
+      "country": "Vietnam",
+      "enabled": false,
+      "$pozastaveno": "Vietnam dočasně vypnutý (17. 10. 2026). Vrátí se smazáním \"enabled\": false – barva i ilustrace zůstávají."
     },
     {
       "code": "SIN",
