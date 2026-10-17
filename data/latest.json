@@ -1,6 +1,6 @@
 {
- "generatedAt": "2026-10-16T09:01:21.309Z",
- "date": "2026-10-16",
+ "generatedAt": "2026-10-17T08:32:56.232Z",
+ "date": "2026-10-17",
  "mode": "live",
  "currency": "CZK",
  "passengers": 2,
@@ -9,12 +9,12 @@
  "source": "Travelpayouts / Aviasales Data API (cachované ceny)",
  "stats": {
   "combinations": 600,
-  "offers": 11,
-  "empty": 589,
+  "offers": 10,
+  "empty": 590,
   "errors": 0,
   "requests": 636,
-  "elapsedSeconds": 196.4,
-  "historyDays": 3
+  "elapsedSeconds": 158.8,
+  "historyDays": 4
  },
  "config": {
   "origins": [
@@ -96,25 +96,25 @@
  },
  "baselines": {
   "PRG-HAN": {
-   "days": 3,
+   "days": 4,
    "avg": 37466,
    "min": 37466,
    "minDate": "2026-10-13"
   },
   "VIE-SGN": {
-   "days": 3,
+   "days": 4,
    "avg": 42520,
    "min": 42520,
    "minDate": "2026-10-13"
   },
   "VIE-HAN": {
-   "days": 3,
-   "avg": 45143,
+   "days": 4,
+   "avg": 45138,
    "min": 45124,
    "minDate": "2026-10-14"
   },
   "MUC-KUL": {
-   "days": 3,
+   "days": 4,
    "avg": 49342,
    "min": 49342,
    "minDate": "2026-10-13"
@@ -291,30 +291,6 @@
    "link": "https://www.aviasales.com/search/MUC2812KUL08012",
    "dealPct": 0,
    "vsMinPct": 0,
-   "isDeal": false,
-   "isAllTimeLow": false,
-   "underTarget": false
-  },
-  {
-   "id": "MUC-KUL-2026-12-28-2027-01-07",
-   "origin": "MUC",
-   "destination": "KUL",
-   "departureDate": "2026-12-28",
-   "returnDate": "2027-01-07",
-   "departureAt": "2026-12-28T13:40:00+01:00",
-   "returnAt": "2027-01-07T09:30:00+08:00",
-   "pricePerPerson": 24853,
-   "priceTotal": 49706,
-   "airline": "VF",
-   "airlineName": "VF",
-   "flightNumber": "42",
-   "transfers": 1,
-   "returnTransfers": 2,
-   "durationTo": 795,
-   "durationBack": 975,
-   "link": "https://www.aviasales.com/search/MUC2812KUL07012",
-   "dealPct": -0.7,
-   "vsMinPct": -0.7,
    "isDeal": false,
    "isAllTimeLow": false,
    "underTarget": false
