@@ -108,9 +108,10 @@
       "SIN",
       "PNH",
       "SAI",
-      "CEB"
+      "CEB",
+      "MNL"
     ],
-    "maxQueriesPerDay": 4,
+    "maxQueriesPerDay": 5,
     "timeoutMs": 30000,
     "retries": 2
   }
