@@ -48,10 +48,20 @@ jobs:
           # Druhý zdroj. Bez něj běh pokračuje, jen se přeskočí.
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: |
+          # Dva profily: pevné termíny a flexibilní okno. Každý má vlastní
+          # složku v data/, takže si nemíchají historii ani baseline.
           case "${{ inputs.mode || 'live' }}" in
-            mock)   node scripts/fetch-prices.mjs --mock ;;
-            sample) node scripts/fetch-prices.mjs --sample --verbose ;;
-            *)      node scripts/fetch-prices.mjs ;;
+            mock)
+              node scripts/fetch-prices.mjs --mock
+              node scripts/fetch-prices.mjs --mock --profile flex
+              ;;
+            sample)
+              node scripts/fetch-prices.mjs --sample --verbose
+              ;;
+            *)
+              node scripts/fetch-prices.mjs
+              node scripts/fetch-prices.mjs --profile flex
+              ;;
           esac
 
       - name: Poslat upozornění na cenovou bombu
@@ -63,7 +73,9 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SITE_URL: ${{ vars.SITE_URL }}
-        run: node scripts/notify.mjs
+        run: |
+          node scripts/notify.mjs
+          node scripts/notify.mjs --profile flex
 
       - name: Uložit data do repozitáře
         run: |

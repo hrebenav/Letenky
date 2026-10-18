@@ -58,6 +58,21 @@ const comboOf = (offer) => String(offer.id).split('#')[0];
 
 /* ---------- načtení dat ---------- */
 
+/** Profily mají vlastní data i historii; který se zobrazuje, říká ?profil= v URL. */
+const PROFILES = {
+  '': { dir: 'data', label: 'Pevné termíny' },
+  flex: { dir: 'data/flex', label: 'Flexibilní termín' },
+};
+
+function currentProfile() {
+  const key = new URLSearchParams(location.search).get('profil') ?? '';
+  return PROFILES[key] ? key : '';
+}
+
+function dataDir() {
+  return PROFILES[currentProfile()].dir;
+}
+
 async function loadJson(path) {
   const res = await fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
@@ -66,7 +81,11 @@ async function loadJson(path) {
 
 async function init() {
   try {
-    const [latest, summary] = await Promise.all([loadJson('data/latest.json'), loadJson('data/summary.json')]);
+    const dir = dataDir();
+    const [latest, summary] = await Promise.all([
+      loadJson(`${dir}/latest.json`),
+      loadJson(`${dir}/summary.json`),
+    ]);
     state.latest = latest;
     state.summary = summary;
   } catch (error) {
@@ -82,6 +101,7 @@ async function init() {
   for (const d of state.latest.config.destinations) state.destinationNames.set(d.code, d.name);
 
   buildChips();
+  markActiveTab();
   bindControls();
   applyTransferCap();
   renderHeader();
@@ -107,8 +127,13 @@ function renderHeader() {
   const ageHours = (Date.now() - generated.getTime()) / 3_600_000;
   const dep = latest.config.departureDates;
   const ret = latest.config.returnDates;
+  // U flexibilního profilu samotné rozpětí dat nestačí – podstatné je pravidlo
+  // o minimální délce pobytu, jinak to vypadá jako obyčejné širší okno.
+  const rule = latest.config.minTripDays
+    ? ` · pobyt aspoň ${latest.config.minTripDays} dní`
+    : '';
   el('subtitle').textContent =
-    `Odlet ${dayMonth(dep[0])}–${dayMonthYear(dep.at(-1))} · návrat ${dayMonth(ret[0])}–${dayMonthYear(ret.at(-1))} · ` +
+    `Odlet ${dayMonth(dep[0])}–${dayMonthYear(dep.at(-1))} · návrat ${dayMonth(ret[0])}–${dayMonthYear(ret.at(-1))}${rule} · ` +
     `${latest.passengers} dospělí · ceny v ${latest.currency} · aktualizováno ${generated.toLocaleString('cs-CZ')}`;
 
   el('footer-source').textContent = `Zdroj dat: ${latest.source}. Historie: ${latest.stats.historyDays + 1} dní.`;
@@ -130,6 +155,17 @@ function renderHeader() {
     );
   } else if (latest.stats.errors > 0) {
     showBanner(`Poslední běh skončil s ${latest.stats.errors} chybami u jednotlivých kombinací – ostatní data jsou v pořádku.`);
+  }
+}
+
+/** Zvýrazní záložku odpovídající zobrazenému profilu. */
+function markActiveTab() {
+  const key = currentProfile();
+  for (const tab of document.querySelectorAll('.tab')) {
+    const isActive = (tab.dataset.profile ?? '') === key;
+    tab.classList.toggle('is-active', isActive);
+    if (isActive) tab.setAttribute('aria-current', 'page');
+    else tab.removeAttribute('aria-current');
   }
 }
 

@@ -118,5 +118,17 @@
     "maxQueriesPerDay": 5,
     "timeoutMs": 30000,
     "retries": 2
+  },
+  "profiles": {
+    "$comment": "Druhý profil sledování. Běží stejným skriptem s --profile flex a zapisuje do data/flex/, takže má vlastní historii, baseline i cenové bomby. Pevný profil (bez --profile) zůstává beze změny.",
+    "flex": {
+      "label": "Flexibilní termín",
+      "windowStart": "2026-12-20",
+      "windowEnd": "2027-01-09",
+      "minTripDays": 14,
+      "$minTripDays": "Minimální odstup data odletu a data zpátečního letu ve dnech. Zpáteční let přistává zhruba o den později, takže celá cesta od odletu po přílet domů vyjde na ~15 dní. Kdybys chtěla přesně 14 dní včetně cesty, dej sem 13.",
+      "secondaryQueriesPerDay": 2,
+      "$secondaryQueriesPerDay": "Kolik z měsíční kvóty SerpApi (250) ukrojí tenhle profil. 2/den = ~62 měsíčně; s pevným profilem (155) jsme na 217 z 250."
+    }
   }
 }

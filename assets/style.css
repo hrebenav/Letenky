@@ -487,3 +487,41 @@ tbody tr:hover { background: var(--surface-2); }
   vertical-align: 1px;
 }
 tr.is-variant td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+
+/* Záložky profilů: stejné trasy, jiná pravidla pro termíny. */
+.tabs {
+  display: flex;
+  gap: 8px;
+  max-width: 1180px;
+  margin: 0 auto 16px;
+  padding: 0 16px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.tab small { font-weight: 400; font-size: 12px; color: var(--text-muted); }
+
+.tab:hover { color: var(--text-primary); border-color: var(--axis); }
+
+.tab.is-active {
+  border-color: var(--series-1);
+  box-shadow: inset 0 0 0 1px var(--series-1);
+  color: var(--text-primary);
+  background: var(--series-1-soft);
+}
+.tab.is-active small { color: var(--text-secondary); }

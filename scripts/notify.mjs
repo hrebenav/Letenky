@@ -14,7 +14,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DATA_DIR = path.join(ROOT, 'data');
+
+// Každý profil hlídá jiné termíny, takže potřebuje i vlastní stav odeslaných
+// upozornění – jinak by nález v jednom profilu umlčel stejnou trasu v druhém.
+const PROFILE = (() => {
+  const i = process.argv.indexOf('--profile');
+  return i !== -1 ? process.argv[i + 1] : null;
+})();
+const DATA_DIR = PROFILE ? path.join(ROOT, 'data', PROFILE) : path.join(ROOT, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'alerts.json');
 
 const DRY_RUN = process.argv.includes('--dry-run');

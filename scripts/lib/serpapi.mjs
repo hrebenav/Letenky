@@ -152,10 +152,9 @@ export function googleFlightsLink({ origin, destination, departureDate, returnDa
  * destinaci a den; index se odvozuje od data, aby se kombinace postupně
  * protočily a za pár týdnů byly pokryté všechny.
  */
-export function planQueries({ destinations, departureDates, returnDates, today, maxQueries }) {
-  const pairs = [];
-  for (const d of departureDates) for (const r of returnDates) if (r > d) pairs.push([d, r]);
-  if (!pairs.length) return [];
+export function planQueries({ destinations, datePairs, today, maxQueries }) {
+  const pairs = datePairs ?? [];
+  if (!pairs.length || maxQueries <= 0) return [];
 
   const dayIndex = Math.floor(new Date(`${today}T00:00:00Z`).getTime() / 86400000);
 

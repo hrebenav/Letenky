@@ -21,7 +21,14 @@ import { airlineName } from './lib/airlines.mjs';
 import { annotateDeals, buildBaselines, buildTrend, loadHistory, pickVariants, routeKey } from './lib/history.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DATA_DIR = path.join(ROOT, 'data');
+// Profily sledují stejné trasy, ale jiné termíny, a nesmí si míchat historii
+// ani baseline – každý proto píše do vlastní složky. Pevný profil zůstává
+// v data/ kvůli zpětné kompatibilitě s už nasbíranými daty.
+const PROFILE = (() => {
+  const i = process.argv.indexOf('--profile');
+  return i !== -1 ? process.argv[i + 1] : null;
+})();
+const DATA_DIR = PROFILE ? path.join(ROOT, 'data', PROFILE) : path.join(ROOT, 'data');
 const HISTORY_DIR = path.join(DATA_DIR, 'history');
 
 const args = new Set(process.argv.slice(2));
@@ -144,6 +151,40 @@ async function provenRoutes() {
   }
 }
 
+/**
+ * Termíny, na které se profil ptá.
+ *
+ * Pevný profil má vyjmenované dny odletu a návratu a bere jejich součin.
+ * Flexibilní bere celé okno a vygeneruje každou dvojici, kde je mezi odletem
+ * a zpátečním letem aspoň minTripDays dní – datum nerozhoduje, délka ano.
+ */
+function resolveDatePairs(config) {
+  if (!PROFILE) {
+    const pairs = [];
+    for (const d of config.departureDates) for (const r of config.returnDates) if (r > d) pairs.push([d, r]);
+    return { datePairs: pairs, profileLabel: 'pevné termíny' };
+  }
+
+  const profile = config.profiles?.[PROFILE];
+  if (!profile) throw new Error(`Profil "${PROFILE}" není v config/search.json.`);
+
+  const toDate = (iso) => new Date(`${iso}T00:00:00Z`);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const start = toDate(profile.windowStart);
+  const end = toDate(profile.windowEnd);
+  const minDays = profile.minTripDays ?? 0;
+
+  const pairs = [];
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const first = new Date(d);
+    first.setUTCDate(first.getUTCDate() + minDays);
+    for (let r = new Date(first); r <= end; r.setUTCDate(r.getUTCDate() + 1)) {
+      pairs.push([iso(d), iso(r)]);
+    }
+  }
+  return { datePairs: pairs, profileLabel: profile.label ?? PROFILE };
+}
+
 async function main() {
   const config = JSON.parse(await readFile(path.join(ROOT, 'config', 'search.json'), 'utf8'));
 
@@ -181,18 +222,18 @@ async function main() {
         requestsPerSecond: config.fetch.requestsPerSecond,
       });
 
+  const { datePairs, profileLabel } = resolveDatePairs(config);
+
   const tasks = [];
   for (const origin of origins) {
     for (const destination of destinations) {
-      for (const departureDate of config.departureDates) {
-        for (const returnDate of config.returnDates) {
-          tasks.push({ origin, destination, departureDate, returnDate });
-        }
+      for (const [departureDate, returnDate] of datePairs) {
+        tasks.push({ origin, destination, departureDate, returnDate });
       }
     }
   }
 
-  log(`▶ ${today} – ${tasks.length} kombinací (${origins.length} odletových × ${destinations.length} cílových × ${config.departureDates.length} × ${config.returnDates.length})`);
+  log(`▶ ${today} – profil "${profileLabel}": ${tasks.length} kombinací (${origins.length} odletových × ${destinations.length} cílových × ${datePairs.length} termínů)`);
   log(`  režim: ${MOCK ? 'DEMO (mock data)' : 'ostrý (Travelpayouts)'} | měna: ${config.currency.toUpperCase()} | cestující: ${config.passengers}`);
 
   const started = Date.now();
@@ -257,10 +298,12 @@ async function main() {
 
   // Záložní měsíční dotaz pro trasy, kde přesné termíny nevrátily vůbec nic.
   if (config.fetch.monthFallback && !MOCK) {
-    const depMonth = config.departureDates[0].slice(0, 7);
-    const retMonth = config.returnDates[0].slice(0, 7);
-    const depSet = new Set(config.departureDates);
-    const retSet = new Set(config.returnDates);
+    const depMonth = datePairs[0][0].slice(0, 7);
+    const retMonth = datePairs[0][1].slice(0, 7);
+    // Z měsíční odpovědi bereme jen dvojice, které profil opravdu sleduje –
+    // u flexibilního okna nestačí hlídat jednotlivá data zvlášť, protože
+    // povolené je až jejich spojení (odstup aspoň minTripDays).
+    const allowedPairs = new Set(datePairs.map(([d, r]) => `${d}|${r}`));
     const emptyRoutes = [];
     for (const origin of origins) {
       for (const destination of destinations) {
@@ -294,7 +337,7 @@ async function main() {
         for (const item of raw) {
           const dep = String(item.departure_at ?? '').slice(0, 10);
           const ret = String(item.return_at ?? '').slice(0, 10);
-          if (!depSet.has(dep) || !retSet.has(ret)) continue;
+          if (!allowedPairs.has(`${dep}|${ret}`)) continue;
           if (!withinTransferLimit(item, config.maxTransfers)) continue;
           const task = { origin, destination, departureDate: dep, returnDate: ret };
           const offer = normalizeOffer(item, task, config, provider);
@@ -311,10 +354,11 @@ async function main() {
   if (config.secondary?.enabled && !MOCK && process.env.SERPAPI_KEY) {
     const queries = planQueries({
       destinations: config.secondary.destinations,
-      departureDates: config.departureDates,
-      returnDates: config.returnDates,
+      datePairs,
       today,
-      maxQueries: config.secondary.maxQueriesPerDay,
+      maxQueries: PROFILE
+        ? (config.profiles[PROFILE].secondaryQueriesPerDay ?? 0)
+        : config.secondary.maxQueriesPerDay,
     });
     const serp = createSerpProvider({
       apiKey: process.env.SERPAPI_KEY,
@@ -424,8 +468,11 @@ async function main() {
     config: {
       origins,
       destinations,
-      departureDates: config.departureDates,
-      returnDates: config.returnDates,
+      departureDates: [...new Set(datePairs.map(([d]) => d))].sort(),
+      returnDates: [...new Set(datePairs.map(([, r]) => r))].sort(),
+      profile: PROFILE,
+      profileLabel,
+      minTripDays: PROFILE ? (config.profiles[PROFILE].minTripDays ?? null) : null,
       maxTransfers: config.maxTransfers ?? null,
     },
     baselines: baselines.byRoute,
@@ -480,7 +527,9 @@ async function main() {
   await writeFile(path.join(HISTORY_DIR, `${today}.json`), JSON.stringify({ ...meta, offers: snapshotOffers }));
   await writeFile(path.join(DATA_DIR, 'latest.json'), JSON.stringify(latest, null, 1));
   await writeFile(path.join(DATA_DIR, 'summary.json'), JSON.stringify(summary));
-  log(`  zapsáno: data/latest.json, data/summary.json, data/history/${today}.json`);
+  // Cesta se liší podle profilu – natvrdo zapsané "data/" lhalo.
+  const rel = path.relative(ROOT, DATA_DIR);
+  log(`  zapsáno: ${rel}/latest.json, ${rel}/summary.json, ${rel}/history/${today}.json`);
 
   return { latest, annotated, config };
 }
