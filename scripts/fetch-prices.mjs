@@ -472,7 +472,9 @@ async function main() {
       returnDates: [...new Set(datePairs.map(([, r]) => r))].sort(),
       profile: PROFILE,
       profileLabel,
-      minTripDays: PROFILE ? (config.profiles[PROFILE].minTripDays ?? null) : null,
+      // Na web jde slovní popis pravidla, ne holé číslo dní: minTripDays je 13
+      // (odlet → zpáteční let), ale pro člověka je to "14 dní i s cestou domů".
+      tripRule: PROFILE ? (config.profiles[PROFILE].ruleLabel ?? null) : null,
       maxTransfers: config.maxTransfers ?? null,
     },
     baselines: baselines.byRoute,

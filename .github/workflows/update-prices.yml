@@ -24,7 +24,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Dva profily, 2100 dotazů při 4 req/s – samotné stahování trvá ~9 min.
+    timeout-minutes: 30
 
     # Na úrovni jobu, aby se na hodnotu dalo odkazovat v `if` jednotlivých kroků.
     env:

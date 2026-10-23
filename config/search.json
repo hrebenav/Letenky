@@ -124,9 +124,11 @@
     "flex": {
       "label": "Flexibilní termín",
       "windowStart": "2026-12-20",
-      "windowEnd": "2027-01-09",
-      "minTripDays": 14,
-      "$minTripDays": "Minimální odstup data odletu a data zpátečního letu ve dnech. Zpáteční let přistává zhruba o den později, takže celá cesta od odletu po přílet domů vyjde na ~15 dní. Kdybys chtěla přesně 14 dní včetně cesty, dej sem 13.",
+      "windowEnd": "2027-01-11",
+      "minTripDays": 13,
+      "ruleLabel": "aspoň 14 dní i s cestou domů",
+      "$ruleLabel": "Co se ukáže na webu. minTripDays je 13, protože zpáteční let přistává o den později – psát na stránku \"13\" by mátlo.",
+      "$minTripDays": "Minimální odstup data odletu a data zpátečního letu. 13 proto, že zpáteční let přistává o den později – od odletu po přílet domů to vyjde na 14 dní, jak bylo zadáno. Okno končí 11. 1., aby flexibilní profil obsáhl i návraty z pevného profilu; jinak se ty dvě záložky skoro míjely.",
       "secondaryQueriesPerDay": 2,
       "$secondaryQueriesPerDay": "Kolik z měsíční kvóty SerpApi (250) ukrojí tenhle profil. 2/den = ~62 měsíčně; s pevným profilem (155) jsme na 217 z 250."
     }

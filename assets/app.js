@@ -129,9 +129,7 @@ function renderHeader() {
   const ret = latest.config.returnDates;
   // U flexibilního profilu samotné rozpětí dat nestačí – podstatné je pravidlo
   // o minimální délce pobytu, jinak to vypadá jako obyčejné širší okno.
-  const rule = latest.config.minTripDays
-    ? ` · pobyt aspoň ${latest.config.minTripDays} dní`
-    : '';
+  const rule = latest.config.tripRule ? ` · ${latest.config.tripRule}` : '';
   el('subtitle').textContent =
     `Odlet ${dayMonth(dep[0])}–${dayMonthYear(dep.at(-1))} · návrat ${dayMonth(ret[0])}–${dayMonthYear(ret.at(-1))}${rule} · ` +
     `${latest.passengers} dospělí · ceny v ${latest.currency} · aktualizováno ${generated.toLocaleString('cs-CZ')}`;
