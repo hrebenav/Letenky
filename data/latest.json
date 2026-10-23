@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-23T13:20:46.274Z",
+ "generatedAt": "2026-10-23T13:27:36.434Z",
  "date": "2026-10-23",
  "mode": "live",
  "currency": "CZK",
@@ -13,7 +13,7 @@
   "empty": 444,
   "errors": 1,
   "requests": 478,
-  "elapsedSeconds": 164.7,
+  "elapsedSeconds": 119.9,
   "historyDays": 10,
   "secondary": {
    "queries": 5,
@@ -89,7 +89,7 @@
   ],
   "profile": null,
   "profileLabel": "pevné termíny",
-  "minTripDays": null,
+  "tripRule": null,
   "maxTransfers": 2
  },
  "baselines": {
