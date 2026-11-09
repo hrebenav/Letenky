@@ -1,5 +1,22 @@
 # ✈️ Letenky – denní sledování cen do jihovýchodní Asie
 
+> ## 🔒 Projekt uzavřen (9. 11. 2026)
+>
+> Letenky jsou koupené, sledování skončilo. **Denní cron je vypnutý** – v
+> `.github/workflows/update-prices.yml` je blok `schedule` zakomentovaný.
+> Ruční spuštění přes *Actions → Run workflow* dál funguje.
+>
+> Web i nasbíraná data zůstávají: <https://hrebenav.github.io/Letenky/>
+> Historie pokrývá **13. 10. – 8. 11. 2026**, pevný profil 27 dní, flexibilní 23 dní.
+>
+> **Obnovení:** odkomentovat `schedule` ve workflow. Config, oba profily i
+> ilustrace zůstávají nastavené; Vietnam je pozastavený příznakem
+> `"enabled": false` v `config/search.json`.
+>
+> **Nepoužívané přístupy** – stojí za zvážení, jestli je nezrušit:
+> `TRAVELPAYOUTS_TOKEN` a `SERPAPI_KEY` v Settings → Secrets, plus účty
+> u Travelpayouts a SerpApi.
+
 Statická microsite, která si každý den sama stáhne ceny letenek pro pevně dané trasy
 a termíny, uloží je do repozitáře jako JSON a zobrazí v tabulce s grafem trendu.
 Žádný server, žádná databáze, žádné měsíční platby.

@@ -1,10 +1,16 @@
 name: Denní stahování cen letenek
 
+# PROJEKT UZAVŘEN 9. 11. 2026 – letenky koupené, sledování zastaveno.
+#
+# Denní cron je vypnutý. Ruční spuštění (workflow_dispatch) zůstává funkční,
+# takže se dá kdykoli jednorázově ověřit, jestli ještě všechno běží.
+#
+# Obnovení sledování: odkomentovat blok `schedule` níž. Nic jiného není potřeba,
+# config i oba profily zůstávají nastavené tak, jak byly.
 on:
-  schedule:
-    # 04:10 UTC = 06:10 letního / 05:10 zimního času. Cron v GitHub Actions běží v UTC
-    # a při vytížení se může o pár desítek minut opozdit – u denního běhu to nevadí.
-    - cron: '10 4 * * *'
+  # schedule:
+  #   # 04:10 UTC = 06:10 letního / 05:10 zimního času.
+  #   - cron: '10 4 * * *'
   workflow_dispatch:
     inputs:
       mode:
